@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynComponent>true</IsRoslynComponent>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Microsoft.CodeAnalysis.Analyzers 由 Microsoft.CodeAnalysis.Common 传递引入，不是本工程显式依赖。
+      本分析器刻意不做 AnalyzerReleases 发布追踪（RS2008），也不启用扩展分析器规则（RS1036），
+      否则在 TreatWarningsAsErrors=true 下会直接构建失败。两条规则在此静默，其余设计期规则照常生效。
+    -->
+    <NoWarn>$(NoWarn);RS2008;RS1036</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

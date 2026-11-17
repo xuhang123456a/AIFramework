@@ -1,0 +1,8 @@
+<Project>
+
+  <!-- 依赖 TargetFramework 的项必须放 targets：Directory.Build.props 在 csproj 声明 TFM 之前求值。 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1' Or '$(TargetFramework)' == 'netstandard2.0'">
+    <Compile Include="$(MSBuildThisFileDirectory)build/IsExternalInit.cs" Link="Polyfills/IsExternalInit.cs" />
+  </ItemGroup>
+
+</Project>

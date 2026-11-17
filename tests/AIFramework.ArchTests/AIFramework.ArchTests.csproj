@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.2" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AIFramework.Analyzer\AIFramework.Analyzer.csproj" />
+    <ProjectReference Include="..\..\src\AIFramework.Contracts\AIFramework.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\AIFramework.Core\AIFramework.Core.csproj" />
+    <ProjectReference Include="..\..\src\AIFramework.Kernel.Turn\AIFramework.Kernel.Turn.csproj" />
+    <ProjectReference Include="..\..\src\AIFramework.Kernel.Realtime\AIFramework.Kernel.Realtime.csproj" />
+    <ProjectReference Include="..\..\src\AIFramework.Features\AIFramework.Features.csproj" />
+  </ItemGroup>
+</Project>
