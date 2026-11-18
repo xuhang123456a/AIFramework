@@ -89,6 +89,17 @@ namespace UnityEngine
         }
     }
 
+    // 与 Contracts.Ports.ILogger 撞名：适配层必须显式别名或全限定，否则 Unity 里就是 CS0104。
+    public interface ILogger
+    {
+    }
+
+    // 与 System.Random 撞名：局外随机必须显式写 System.Random。
+    public static class Random
+    {
+        public static int Range(int minInclusive, int maxExclusive) { return minInclusive; }
+    }
+
     public static class Debug
     {
         public static void Log(object message) { }
@@ -110,4 +121,5 @@ namespace UnityEngine
     {
     }
 }
+
 

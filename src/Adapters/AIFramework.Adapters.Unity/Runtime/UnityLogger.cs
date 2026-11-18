@@ -1,6 +1,8 @@
 #nullable enable
-using AIFramework.Contracts.Ports;
 using UnityEngine;
+// 注意：Unity 自己有一个 UnityEngine.ILogger（见 PlayerSettings 相关 API），
+// 一旦同时 using 两个命名空间，裸写 ILogger 会撞成 CS0104。这里用别名把归属钉死。
+using ILogger = AIFramework.Contracts.Ports.ILogger;
 
 namespace AIFramework.Adapters.Unity
 {

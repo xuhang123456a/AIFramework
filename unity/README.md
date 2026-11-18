@@ -28,15 +28,18 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 - 场景里两个 Capsule（护盾单位 / 来袭单位）与一颗飞行物；`AIFrameworkBehaviour` 每帧推进 `BattleWorld.Step`。
 - 反射发生后打印 `ReflectedCount=1`，主角存活则结算 `IsVictory=true`。
 
-## 三、把编译守卫接进 Unity（可选但推荐）
+## 三、把编译守卫接进 Unity（可选，默认不装）
 
-自研 Roslyn 规则 `AIF001~AIF004` 也可以在 Unity 编辑器里实时生效：
+纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。
+
+需要时装：
 
 ```powershell
-pwsh unity/tools/setup-analyzer.ps1
+pwsh unity/tools/setup-analyzer.ps1          # 安装（会同时写 .meta：打 RoslynAnalyzer 标签 + 关闭引用校验）
+pwsh unity/tools/setup-analyzer.ps1 -Remove  # 移除
 ```
 
-脚本会 `dotnet build` 分析器并复制到 `unity/Assets/Plugins/Analyzers/`；`Assets/Editor/AnalyzerLabelInstaller.cs` 会自动给它打上 `RoslynAnalyzer` 标签（不需要手点）。
+为什么要写 meta：Unity 会把 `Assets/` 下的 dll 当普通插件做**引用校验**，分析器引用的 `Microsoft.CodeAnalysis` 在工程里不存在，于是报 `Unable to resolve reference 'Microsoft.CodeAnalysis'`。脚本把 `validateReferences` 置 0 并打上 `RoslynAnalyzer` 标签，Unity 才会把它当分析器而不是插件。仍失败就跑 `-Remove` 退回纯 `dotnet build` 形态。
 
 ## 三之二、没有 Unity 也能校验适配层（推荐进 CI）
 
@@ -62,4 +65,7 @@ pwsh unity/tools/check-adapter-compile.ps1
 |---|---|---|
 | `Project has invalid dependencies: com.aiframework.*: The file [...\unity\src\...\package.json] cannot be found` | `manifest.json` 的 `file:` 相对路径基准是 `unity/Packages/`，不是工程根 | 确保是 `file:../../src/...`；改完点 Retry，或删掉 `Packages/packages-lock.json` 后重开工程 |
 | 包解析成功但 `AIFramework.*` 报编译错 | `src/<Assembly>/` 下出现了 `bin/`、`obj/`，Unity 把编译产物当资源导入 | 删掉它们；根 `Directory.Build.props` 已把产物重定向到 `artifacts/`，不要改回去 |
-| Unity 里不报 `AIF001~AIF004` | 分析器 dll 没打 `RoslynAnalyzer` 标签 | 跑 `pwsh unity/tools/setup-analyzer.ps1`，`AnalyzerLabelInstaller` 会自动打标签 |
+| Unity 里不报 `AIF001~AIF004` | 分析器 dll 没装（默认不装） | 跑 `pwsh unity/tools/setup-analyzer.ps1`；报 Roslyn 解析失败就 `-Remove` 退回，红线仍由 `dotnet build` 守 |
+| Console 报 `Unable to resolve reference 'Microsoft.CodeAnalysis'` | 分析器 dll 被当普通插件做引用校验 | 同上：`setup-analyzer.ps1 -Remove` 立即解除；重装用脚本（会写 `validateReferences: 0` 的 meta） |
+| 报 `CS0104: 'ILogger' 是不明确的引用` | `UnityEngine.ILogger` 与 `Contracts.Ports.ILogger` 撞名 | 已在 `UnityLogger.cs` 用 `using ILogger = ...` 修好；新增文件同时 using 这两个命名空间时同样要写别名（`check-adapter-compile.ps1` 的形状桩已含 `UnityEngine.ILogger`，会提前拦到） |
+| Package Manager 报 `Error searching for packages` | 访问 Unity 官方 registry 失败（网络/代理），与本工程无关 | 本地 `file:` 包不经 registry，可忽略；需要官方包时再修代理 |
