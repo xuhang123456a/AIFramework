@@ -16,7 +16,8 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 ## 一、首次打开
 
 1. Unity Hub → **Add / Open project** → 选择本目录（`unity/`）。
-   - `ProjectSettings/ProjectVersion.txt` 固定为 `6000.0.23f1`；本机版本不同时 Hub 会提示切换或升级，**接受即可**（2022.3 LTS 同样支持）。
+   - `ProjectSettings/ProjectVersion.txt` 固定为 `6000.3.21f1`；本机版本不同时 Hub 会提示切换或升级，**接受即可**（2022.3 LTS 同样支持 5 个纯逻辑包）。
+   - **`manifest.json` 里的 `file:` 相对路径以 `unity/Packages/` 为基准**（不是工程根！），所以写的是 `file:../../src/...`。写成 `file:../src/...` 会解析到 `unity/src/` 并报 `Project has invalid dependencies: ... cannot be found`。
    - Unity 会自动补齐 `ProjectSettings/` 其余文件，并把 `.meta` 生成到各包目录——**把这些 .meta 一起提交**，否则每次打开都会重新分配 GUID。
 2. 等待包解析。Console 里若出现 `com.aiframework.*` 的编译错误，先确认根目录 `artifacts/` 存在（Unity 不导入仓库根，不影响编译；这里只是提示你别把 `bin/obj` 生成回 `src/` 下）。
 3. 菜单 **AIFramework → 创建演示场景** → 保存 → Play。
@@ -54,3 +55,11 @@ pwsh unity/tools/check-adapter-compile.ps1
 | UI 绑定代码生成 | **未接入** | `UIBindNode` 标记 + `I<Panel>View.g.cs` / `<Panel>ViewBinder.g.cs` 双向生成器 |
 | 导表 | 只有 Phase 1 的 12 字节夹具（`Assets/StreamingAssets/AIFrameworkDemo/TbSignInReward.bin`） | 接 Luban `cs-bin`，`IBinaryTableLoader` 换实现 |
 | 场景/预制体 | 只有菜单生成的演示场景 | 正式场景由项目侧搭建 |
+
+## 五、排障
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `Project has invalid dependencies: com.aiframework.*: The file [...\unity\src\...\package.json] cannot be found` | `manifest.json` 的 `file:` 相对路径基准是 `unity/Packages/`，不是工程根 | 确保是 `file:../../src/...`；改完点 Retry，或删掉 `Packages/packages-lock.json` 后重开工程 |
+| 包解析成功但 `AIFramework.*` 报编译错 | `src/<Assembly>/` 下出现了 `bin/`、`obj/`，Unity 把编译产物当资源导入 | 删掉它们；根 `Directory.Build.props` 已把产物重定向到 `artifacts/`，不要改回去 |
+| Unity 里不报 `AIF001~AIF004` | 分析器 dll 没打 `RoslynAnalyzer` 标签 | 跑 `pwsh unity/tools/setup-analyzer.ps1`，`AnalyzerLabelInstaller` 会自动打标签 |
