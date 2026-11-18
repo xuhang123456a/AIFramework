@@ -14,6 +14,9 @@ namespace UnityEngine
         public override bool Equals(object o) { return ReferenceEquals(this, o); }
 
         public override int GetHashCode() { return base.GetHashCode(); }
+
+        /// <summary>与 UnityEngine.Object.Instantiate(Object, Transform) 同形；派生类的非限定调用靠它解析。</summary>
+        public static T Instantiate<T>(T original, Transform parent) where T : Object { return original; }
     }
 
     public class Component : Object
@@ -26,6 +29,10 @@ namespace UnityEngine
     public class GameObject : Object
     {
         public Transform transform = new Transform();
+
+        public bool activeSelf { get; private set; } = true;
+
+        public void SetActive(bool value) { activeSelf = value; }
     }
 
     public class Transform : Component
@@ -121,5 +128,7 @@ namespace UnityEngine
     {
     }
 }
+
+
 
 

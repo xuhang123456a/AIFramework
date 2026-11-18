@@ -28,6 +28,22 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 - 场景里两个 Capsule（护盾单位 / 来袭单位）与一颗飞行物；`AIFrameworkBehaviour` 每帧推进 `BattleWorld.Step`。
 - 反射发生后打印 `ReflectedCount=1`，主角存活则结算 `IsVictory=true`。
 
+## 二之二、UI 绑定（生成物已就绪，尚未接进演示场景）
+
+签到面板的视图契约已经由 `tools/viewgen` 从 [SignIn.bindings.json](../src/AIFramework.Features/Feature.DailySignIn/SignIn.bindings.json) 生成：
+
+- 左半边（纯逻辑）：[ISignInView.g.cs](../src/AIFramework.Features/Feature.DailySignIn/ISignInView.g.cs)
+- 右半边（引擎皮肤）：[SignInViewBinder.g.cs](../src/Adapters/AIFramework.Adapters.Unity/Runtime/Views/SignInViewBinder.g.cs)
+
+在场景里用它：
+
+1. 建 Canvas，再建一个空 GameObject，挂 `SignInViewBinder`。
+2. Inspector 里把列表容器拖到 `slotsContent`、列表项预制体拖到 `slotsItemPrefab`。
+3. 按钮的 `onClick` 连到绑定组件上的 `RaiseClaimClicked`（带序号的补签按钮连 `RaiseRetroactiveClicked`）。
+4. 列表项要显示什么，由项目侧写一个 `partial class SignInViewBinder` 实现 `OnBindSlotsItem(GameObject item, SignInSlotViewData data)` —— 生成器只管容器与显隐，不管皮肤细节。
+
+演示场景目前用的是无头 `NullSignInView`（只往 Console 打格子状态），因为 Phase 1 还没做「从 `UIBindNode` 导出 bindings.json」的编辑器工具。
+
 ## 三、把编译守卫接进 Unity（可选，默认不装）
 
 纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。
