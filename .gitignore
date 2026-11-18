@@ -16,3 +16,19 @@ TestResults/
 # OS
 .DS_Store
 Thumbs.db
+
+# Unity：工程缓存与自动生成物（与 unity/ 宿主工程配合）
+unity/Library/
+unity/Temp/
+unity/Logs/
+unity/Obj/
+unity/UserSettings/
+unity/Build/
+unity/Builds/
+unity/*.csproj
+unity/*.sln
+unity/*.unityproj
+
+# Unity：由 unity/tools/setup-analyzer.ps1 复制进来的分析器二进制，不入库
+unity/Assets/Plugins/Analyzers/*.dll
+unity/Assets/Plugins/Analyzers/*.dll.meta

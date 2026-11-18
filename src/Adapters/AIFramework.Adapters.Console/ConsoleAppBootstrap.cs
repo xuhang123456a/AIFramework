@@ -8,6 +8,7 @@ using AIFramework.Features.DailySignIn;
 using AIFramework.Kernel.Realtime;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace AIFramework.Adapters.Console
 {
@@ -19,6 +20,9 @@ namespace AIFramework.Adapters.Console
     public sealed class ConsoleAppBootstrap
     {
         private const int LootReasonTagId = 6001;
+
+        /// <summary>存档冒烟用的键名（3 个 int = 12 字节）。</summary>
+        private const string SignInStateKey = "signin.state";
 
         private readonly IIOWriter _writer;
         private readonly CausalTagRegistry _registry;
@@ -81,6 +85,7 @@ namespace AIFramework.Adapters.Console
             int realtimeFrames = RunRealtimeSandbox();
 
             ExportCausalLog();
+            RunStorageSmoke(signIn);
             _writer.WriteLine("Realtime 推进帧数=" + realtimeFrames + "，最终道具=" + DescribeInventory());
             _writer.WriteLine("=== 冒烟结束 ===");
         }
@@ -179,6 +184,61 @@ namespace AIFramework.Adapters.Console
             {
                 LootItem loot = loots[i];
                 _bus.Send(new GrantItemCommand(loot.ItemId, loot.Count, LootReasonTagId));
+            }
+        }
+
+        /// <summary>
+        /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
+        /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
+        /// </summary>
+        private void RunStorageSmoke(SignInHandler signIn)
+        {
+            string directory = Path.Combine(
+                Path.GetTempPath(), "aiframework-smoke", Guid.NewGuid().ToString("N"));
+            try
+            {
+                var storage = new FileSystemStoragePort(directory);
+                SignInState state = signIn.Snapshot;
+
+                byte[] payload;
+                using (var buffer = new MemoryStream(12))
+                {
+                    using (var writer = new BinaryWriter(buffer, System.Text.Encoding.UTF8, leaveOpen: true))
+                    {
+                        writer.Write(state.CycleStartDayIndex);
+                        writer.Write(state.ClaimedCount);
+                        writer.Write(state.LastClaimDayIndex);
+                    }
+
+                    payload = buffer.ToArray();
+                }
+
+                storage.Write(SignInStateKey, payload);
+
+                // 重新 new 一个端口实例：确认落盘字节真的过了磁盘，而不是内存缓存。
+                var reopened = new FileSystemStoragePort(directory);
+                byte[] raw = reopened.Read(SignInStateKey)
+                    ?? throw new InvalidOperationException("存档往返失败：键 " + SignInStateKey + " 读回为空。");
+
+                int cycle;
+                int claimed;
+                int last;
+                using (var reader = new BinaryReader(new MemoryStream(raw, writable: false)))
+                {
+                    cycle = reader.ReadInt32();
+                    claimed = reader.ReadInt32();
+                    last = reader.ReadInt32();
+                }
+
+                _writer.WriteLine("[Storage] 存档往返: cycle=" + cycle + " claimed=" + claimed
+                    + " last=" + last + " keys=[" + string.Join(", ", reopened.ListKeys()) + "]");
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
             }
         }
 
