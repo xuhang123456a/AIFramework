@@ -71,8 +71,23 @@ namespace AIFramework.Adapters.Unity
         /// </summary>
         private IGameplaySession? _activeSession;
 
-        /// <summary>当前实时战局引用（用于结算时读反射/打断计数）；回合制会话时为 <c>null</c>。</summary>
-        private BattleWorld? _activeRealtime;
+        /// <summary>当前实时战局布场入口（Contracts 接口，不依赖内核具体类型）；回合制会话时为 <c>null</c>。</summary>
+        private IRealtimeSandbox? _activeSandbox;
+
+        /// <summary>
+        /// 固定步长（秒）。<b>为什么要累加器</b>：<c>BattleWorld.Step</c> 按秒推进，若直接把可变的
+        /// <c>Time.deltaTime</c> 传进去，帧率抖动会改变推演结果，回放/断线重连就复现不出来。
+        /// 传 0 表示退化为"每帧一步、步长取 deltaTime"（只用于纯表现向的场合）。
+        /// </summary>
+        [SerializeField]
+        private float _fixedStepSeconds = 1f / 60f;
+
+        /// <summary>单帧最多补几步：防止卡顿后一次性追帧把整帧拖死（追上不的部分直接丢弃）。</summary>
+        [SerializeField]
+        private int _maxStepsPerFrame = 4;
+
+        /// <summary>固定步长累加器；只在 <c>Update</c> 里读写，不做持久化。</summary>
+        private float _stepAccumulator;
 
         /// <summary>
         /// 会话刚结束、结果还没取。<b>为什么需要这个标记</b>：<c>EndAndCollect</c> 只能调用一次，
@@ -100,10 +115,10 @@ namespace AIFramework.Adapters.Unity
             }
         }
 
-        /// <summary>当前实时战局；没有进行中的 Realtime 对局时为 <c>null</c>。</summary>
-        public BattleWorld? Realtime
+        /// <summary>当前实时战局布场入口；没有进行中的 Realtime 对局时为 <c>null</c>。</summary>
+        public IRealtimeSandbox? Realtime
         {
-            get { return _activeRealtime; }
+            get { return _activeSandbox; }
         }
 
         /// <summary>装配框架。异常在这里被拦下并打日志：一个数据缺失不该让整个场景失效。</summary>
@@ -176,7 +191,34 @@ namespace AIFramework.Adapters.Unity
                 return;
             }
 
-            session.Step(Time.deltaTime);
+            if (_fixedStepSeconds <= 0f)
+            {
+                session.Step(Time.deltaTime);
+                return;
+            }
+
+            _stepAccumulator += Time.deltaTime;
+
+            int steps = 0;
+            while (_stepAccumulator >= _fixedStepSeconds && steps < _maxStepsPerFrame)
+            {
+                _stepAccumulator -= _fixedStepSeconds;
+                steps++;
+                session.Step(_fixedStepSeconds);
+
+                if (session.IsFinished)
+                {
+                    _activeSession = null;
+                    _resultPending = true;
+                    break;
+                }
+            }
+
+            // 追不上就把余量清掉：否则卡顿一次之后会长期积压，越追越慢。
+            if (steps >= _maxStepsPerFrame)
+            {
+                _stepAccumulator = 0f;
+            }
         }
 
         /// <summary>会话结束时的一次性收尾：取结果、打日志（允许拼字符串，因为只发生一次）。</summary>
@@ -195,7 +237,8 @@ namespace AIFramework.Adapters.Unity
         private void OnDestroy()
         {
             _activeSession = null;
-            _activeRealtime = null;
+            _activeSandbox = null;
+            _stepAccumulator = 0f;
             _resultPending = false;
             _ready = false;
 
@@ -232,9 +275,18 @@ namespace AIFramework.Adapters.Unity
             host.Spatial.Clear();
 
             var init = new GameplayInitData(levelId, randomSeed, unitCount);
+            _stepAccumulator = 0f;
             _activeSession = host.Sessions.Begin(GameplayKernelType.Realtime, in init);
-            _activeRealtime = host.Factory.LastRealtime;
-            return _activeRealtime != null;
+
+            // 只按 Contracts 接口拿布场能力：适配层不再依赖 BattleWorld 具体类型。
+            _activeSandbox = _activeSession as IRealtimeSandbox;
+            if (_activeSandbox == null)
+            {
+                host.Log.Error("Realtime 内核未实现 IRealtimeSandbox，无法布场。");
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -257,8 +309,8 @@ namespace AIFramework.Adapters.Unity
             }
 
             AIFrameworkUnityHost? host = _host;
-            BattleWorld? world = _activeRealtime;
-            if (host == null || world == null)
+            IRealtimeSandbox? sandbox = _activeSandbox;
+            if (host == null || sandbox == null)
             {
                 if (host != null)
                 {
@@ -269,7 +321,7 @@ namespace AIFramework.Adapters.Unity
             }
 
             Vector3 position = collider.transform.position;
-            UnitHandle handle = world.SpawnUnit(
+            UnitHandle handle = sandbox.SpawnUnit(
                 new Vec2(position.x, position.z), radius, armorLevel, hp, tags);
 
             if (!handle.IsValid)
@@ -282,7 +334,57 @@ namespace AIFramework.Adapters.Unity
             return handle;
         }
 
+        /// <summary>
+        /// 把一个场景碰撞体绑成飞行物：<c>BattleWorld.SpawnProjectile</c> 生成句柄，
+        /// 再登记到空间查询的飞行物表，护盾反射阶段才查得到它。
+        /// </summary>
+        /// <param name="collider">代表该飞行物的碰撞体。</param>
+        /// <param name="owner">归属单位（反射后由内核改写）。</param>
+        /// <param name="velocity">速度（每秒世界单位，战斗平面 X-Z）。</param>
+        /// <param name="damage">伤害值。</param>
+        /// <param name="tags">初始标签掩码。</param>
+        /// <returns>生成的飞行物句柄；没有活跃会话或槽位耗尽时返回无效句柄。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="collider"/> 为 <c>null</c>。</exception>
+        public ProjectileHandle BindProjectile(
+            Collider collider,
+            UnitHandle owner,
+            Vec2 velocity,
+            int damage,
+            GameplayTagMask tags)
+        {
+            if (collider == null)
+            {
+                throw new ArgumentNullException(nameof(collider));
+            }
+
+            AIFrameworkUnityHost? host = _host;
+            IRealtimeSandbox? sandbox = _activeSandbox;
+            if (host == null || sandbox == null)
+            {
+                if (host != null)
+                {
+                    host.Log.Warn("尚无活跃 Realtime 会话，先调用 BeginRealtime 再绑定飞行物。");
+                }
+
+                return default;
+            }
+
+            Vector3 position = collider.transform.position;
+            ProjectileHandle handle = sandbox.SpawnProjectile(
+                owner, new Vec2(position.x, position.z), velocity, damage, tags);
+
+            if (!handle.IsValid)
+            {
+                host.Log.Error("飞行物槽位耗尽，绑定失败：" + collider.name);
+                return handle;
+            }
+
+            host.Spatial.RegisterProjectileCollider(collider, handle);
+            return handle;
+        }
+
         /// <summary>按 Inspector 配置逐个生成并绑定场景单位；第一个（可选）挂护盾标签。</summary>
+        private void BindSceneUnits(AIFrameworkUnityHost host)
         {
             Collider[] units = _sceneUnits;
             for (int i = 0; i < units.Length; i++)
@@ -356,10 +458,10 @@ namespace AIFramework.Adapters.Unity
 
             GameplayResult result = host.Sessions.EndAndCollect();
 
-            BattleWorld? world = _activeRealtime;
-            int reflected = world != null ? world.ReflectedCount : 0;
-            int interrupted = world != null ? world.InterruptedCount : 0;
-            _activeRealtime = null;
+            IRealtimeSandbox? sandbox = _activeSandbox;
+            int reflected = sandbox != null ? sandbox.ReflectedCount : 0;
+            int interrupted = sandbox != null ? sandbox.InterruptedCount : 0;
+            _activeSandbox = null;
 
             host.Log.Info("[Realtime] 结算：胜负=" + result.IsVictory
                 + "，推演帧数=" + result.StepCount

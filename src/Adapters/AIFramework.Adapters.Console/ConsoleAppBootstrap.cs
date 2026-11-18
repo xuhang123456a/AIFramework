@@ -152,14 +152,20 @@ namespace AIFramework.Adapters.Console
             var init = new GameplayInitData(2, 777, 2);
             IGameplaySession session = _host.Begin(GameplayKernelType.Realtime, in init);
 
-            BattleWorld world = _factory.LastRealtime
-                ?? throw new InvalidOperationException("Realtime 沙盒未创建，装配顺序有误。");
-            _spatial.Bind(world, world);
+            // 只走 Contracts：会话按 IRealtimeSandbox 布场，只读视图按接口绑定空间查询，
+            // 适配层不需要知道内核具体类型（也就不会把 BattleWorld 引脚泄漏出去）。
+            IRealtimeSandbox sandbox = _host.Current as IRealtimeSandbox
+                ?? throw new InvalidOperationException("Realtime 内核未实现 IRealtimeSandbox。");
+            IUnitWorldReadView units = session as IUnitWorldReadView
+                ?? throw new InvalidOperationException("Realtime 内核未实现 IUnitWorldReadView。");
+            IProjectileWorldReadView projectiles = session as IProjectileWorldReadView
+                ?? throw new InvalidOperationException("Realtime 内核未实现 IProjectileWorldReadView。");
+            _spatial.Bind(units, projectiles);
 
             GameplayTagMask shieldTags = GameplayTagMask.Empty.Add(GameplayTags.UnitShieldActive);
-            world.SpawnUnit(new Vec2(0f, 0f), 1f, 5, 100, shieldTags);
-            UnitHandle attacker = world.SpawnUnit(new Vec2(0f, 3f), 1f, 1, 5, GameplayTagMask.Empty);
-            world.SpawnProjectile(attacker, new Vec2(0f, 1.4f), new Vec2(0f, -6f), 10, GameplayTagMask.Empty);
+            sandbox.SpawnUnit(new Vec2(0f, 0f), 1f, 5, 100, shieldTags);
+            UnitHandle attacker = sandbox.SpawnUnit(new Vec2(0f, 3f), 1f, 1, 5, GameplayTagMask.Empty);
+            sandbox.SpawnProjectile(attacker, new Vec2(0f, 1.4f), new Vec2(0f, -6f), 10, GameplayTagMask.Empty);
 
             int frames = 0;
             for (int i = 0; i < 120 && !session.IsFinished; i++)
@@ -169,8 +175,8 @@ namespace AIFramework.Adapters.Console
             }
 
             GameplayResult result = _host.EndAndCollect();
-            _writer.WriteLine("[Realtime] 推进帧=" + frames + "，反射次数=" + world.ReflectedCount
-                + "，打断次数=" + world.InterruptedCount + "，胜负=" + result.IsVictory
+            _writer.WriteLine("[Realtime] 推进帧=" + frames + "，反射次数=" + sandbox.ReflectedCount
+                + "，打断次数=" + sandbox.InterruptedCount + "，胜负=" + result.IsVictory
                 + "，结算步数=" + result.StepCount + "，触发标签数=" + result.TriggeredTags.Count
                 + "，战利品=" + DescribeLoots(result));
             GrantLoots(result);

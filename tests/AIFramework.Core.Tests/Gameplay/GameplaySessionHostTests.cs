@@ -94,6 +94,28 @@ namespace AIFramework.Core.Tests.Gameplay
         }
 
         [Fact]
+        public void Current_ReflectsActiveSessionLifecycle()
+        {
+            FakeKernelFactory factory = new FakeKernelFactory();
+            GameplaySessionHost host = new GameplaySessionHost(factory);
+            GameplayInitData init = new GameplayInitData(2, 2, 2);
+
+            Assert.Null(host.Current);
+
+            IGameplaySession session = host.Begin(GameplayKernelType.Turn, in init);
+            Assert.Same(session, host.Current);
+
+            host.EndAndCollect();
+            Assert.Null(host.Current);
+
+            host.Begin(GameplayKernelType.Turn, in init);
+            Assert.NotNull(host.Current);
+
+            host.Release();
+            Assert.Null(host.Current);
+        }
+
+        [Fact]
         public void EndAndCollect_WhenCollectResultThrows_PropagatesSameExceptionAndKeepsSession()
         {
             FakeKernelFactory factory = new FakeKernelFactory();

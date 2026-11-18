@@ -20,7 +20,7 @@ namespace AIFramework.Kernel.Realtime
     /// </para>
     /// </summary>
     public sealed partial class BattleWorld
-        : IGameplaySession, IUnitWorldReadView, IProjectileWorldReadView, IIntentWriter
+        : IGameplaySession, IRealtimeSandbox, IUnitWorldReadView, IProjectileWorldReadView, IIntentWriter
     {
         /// <summary>单位槽位下限容量（构造期一次分配）。</summary>
         private const int MinUnitCapacity = 64;

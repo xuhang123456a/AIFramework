@@ -200,6 +200,27 @@ namespace AIFramework.Core.Tests.Kernel
         }
 
         [Fact]
+        public void BattleWorld_ImplementsRealtimeSandboxSoAdaptersNeverTouchTheConcreteType()
+        {
+            BattleWorld world = CreateWorld(2, Array.Empty<ISkillInteractionPhase>());
+
+            // 适配层只应该通过 Contracts 里的 IRealtimeSandbox 布场（否则 BattleWorld 引脚会泄漏到 Adapters）。
+            IRealtimeSandbox sandbox = Assert.IsAssignableFrom<IRealtimeSandbox>(world);
+
+            UnitHandle unit = sandbox.SpawnUnit(new Vec2(1f, 2f), 0.5f, 3, 10, GameplayTagMask.Empty);
+            Assert.True(unit.IsValid);
+
+            ProjectileHandle projectile = sandbox.SpawnProjectile(
+                unit, new Vec2(1f, 2f), new Vec2(0f, 1f), 1, GameplayTagMask.Empty);
+            Assert.True(projectile.IsValid);
+
+            Assert.Equal(0, sandbox.ReflectedCount);
+            Assert.Equal(0, sandbox.InterruptedCount);
+            Assert.Equal(1, world.UnitCount);
+            Assert.Equal(1, world.ProjectileCount);
+        }
+
+        [Fact]
         public void ReflectArbitration_RejectsProjectileTaggedUnreflectable()
         {
             ReflectProbePhase phase = new ReflectProbePhase();

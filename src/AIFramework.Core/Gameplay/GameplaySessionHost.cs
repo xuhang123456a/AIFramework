@@ -35,6 +35,20 @@ namespace AIFramework.Core.Gameplay
             get { return _session != null; }
         }
 
+        /// <summary>
+        /// 当前活跃会话；无会话时为 <c>null</c>。
+        /// <para>
+        /// <b>为什么必须有这个属性</b>：宿主/关卡脚本常常需要"拿到刚开的这局"（例如转成
+        /// <see cref="IRealtimeSandbox"/> 布场）。若只暴露 <see cref="HasActiveSession"/>，调用方只能自己
+        /// 镜像一份引用，两侧一旦不同步就会重复 <see cref="Begin"/> 抛异常。
+        /// </para>
+        /// <para>只读；所有权仍在宿主，释放只能走 <see cref="EndAndCollect"/> 或 <see cref="Release"/>。</para>
+        /// </summary>
+        public IGameplaySession? Current
+        {
+            get { return _session; }
+        }
+
         /// <summary>开启一局：向工厂申请会话并接管所有权。</summary>
         /// <param name="type">要装配的玩法卡带类型。</param>
         /// <param name="init">战前数据快照（<c>in</c> 只读引用，不复制）。</param>

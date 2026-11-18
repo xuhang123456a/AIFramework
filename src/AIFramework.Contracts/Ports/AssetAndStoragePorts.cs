@@ -22,6 +22,10 @@ namespace AIFramework.Contracts.Ports
     /// <summary>
     /// 本地持久化端口。真机接 <c>Application.persistentDataPath</c>，命令行接任意目录。
     /// <para>写入必须是原子的（先写临时文件再替换），掉电/崩溃时不能留下半个存档。</para>
+    /// <para>
+    /// <b>key 是逻辑键，落盘命名由实现自行决定</b>（例如控制台实现落成 <c>key.sav</c>、Unity 实现直接用 <c>key</c>）。
+    /// 因此存档**不支持跨适配器直接拷贝**：平台间迁移必须走导出/导入逻辑，而不是复制文件。
+    /// </para>
     /// </summary>
     public interface IStoragePort
     {

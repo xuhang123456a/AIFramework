@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AIFramework.Contracts.Numerics;
 
 namespace AIFramework.Contracts.Gameplay
 {
@@ -107,5 +108,34 @@ namespace AIFramework.Contracts.Gameplay
     public interface IGameplayKernelFactory
     {
         IGameplaySession Create(GameplayKernelType type, in GameplayInitData init);
+    }
+
+    /// <summary>
+    /// 强实时沙盒的"布场"能力：把参战单位与飞行物放进战场。
+    /// <para>
+    /// <b>为什么单独抽出来</b>：<see cref="IGameplaySession"/> 只管"推进与结算"，而宿主/关卡脚本还要能布场。
+    /// 若只暴露具体 <c>BattleWorld</c>，装配层就会被迫引用内核具体类型（引脚泄漏到适配层）。
+    /// 由 <c>BattleWorld</c> 实现本接口，宿主从 <see cref="IGameplaySession"/> 结果上 <c>as</c> 转过来即可。
+    /// </para>
+    /// <para>布场只允许在 <see cref="IGameplaySession.Step"/> 之外调用（装配期），帧内布场会破坏预分配假设。</para>
+    /// </summary>
+    public interface IRealtimeSandbox
+    {
+        /// <summary>本局累计反射次数（诊断用）。</summary>
+        int ReflectedCount { get; }
+
+        /// <summary>本局累计打断次数（诊断用）。</summary>
+        int InterruptedCount { get; }
+
+        /// <summary>放入一个单位，返回其句柄；槽位耗尽返回无效句柄。</summary>
+        UnitHandle SpawnUnit(Vec2 position, float radius, int armorLevel, int hp, GameplayTagMask tags);
+
+        /// <summary>放入一颗飞行物，返回其句柄；槽位耗尽返回无效句柄。</summary>
+        ProjectileHandle SpawnProjectile(
+            UnitHandle owner,
+            Vec2 position,
+            Vec2 velocity,
+            int damage,
+            GameplayTagMask tags);
     }
 }

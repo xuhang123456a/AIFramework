@@ -37,6 +37,14 @@ pwsh unity/tools/setup-analyzer.ps1
 
 脚本会 `dotnet build` 分析器并复制到 `unity/Assets/Plugins/Analyzers/`；`Assets/Editor/AnalyzerLabelInstaller.cs` 会自动给它打上 `RoslynAnalyzer` 标签（不需要手点）。
 
+## 三之二、没有 Unity 也能校验适配层（推荐进 CI）
+
+```powershell
+pwsh unity/tools/check-adapter-compile.ps1
+```
+
+它把 `src/Adapters/AIFramework.Adapters.Unity/Runtime/**` 连同 `unity/tools/shims/` 里的 UnityEngine 形状桩，按 `netstandard2.1 + TreatWarningsAsErrors` 编译一遍。能拦住语法/类型/接口实现缺成员/API 形状写错；**拦不住运行时行为**（桩里的 `Physics`、`Debug`、`Time` 全是空实现）。新增 Unity API 时要同步补桩。
+
 ## 四、已知限制（按优先级）
 
 | 限制 | 现状 | 后续 |
