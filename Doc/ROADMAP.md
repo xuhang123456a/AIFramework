@@ -27,7 +27,7 @@
 | T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片 + Presenter + Unity 装配已完成，缺场景 UI |
 | T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [x] 内核+测试+场景 |
 | T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核+测试+场景 |
-| T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [~] 竞技场场景开发中 |
+| T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [x] 场景 + 绑定器（碰撞体接入中） |
 | T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [x] 切片 + 控制器 + 场景 |
 | T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [x] 切片 + 测试（场景待接） |
 | T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [x] 切片 + 测试（场景待接） |
@@ -60,12 +60,12 @@
 | T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
 | T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [~] 第一版（UnitySceneDirector，同步加载 + 异常兜底） |
 | T3-5 | 通用 UI 框架 | 弹窗栈/Toast/Loading/红点绑定 | [ ] |
-| T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [~] Core 录制/播放器开发中 |
+| T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [x] Core 录制/播放/指纹 + 16 例 |
 | T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [ ] |
 | T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [ ] |
 | T3-9 | 本地化 | 文案表 + 语言切换 + TMP 回退 | [ ] |
 | T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [ ] |
-| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] Unity EditMode 测试已可跑，性能门禁待加 |
+| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] 回合内核 0 分配门禁已加；Realtime 帧分配门禁与 Profiler 采样待补 |
 | T3-12 | 编辑器工具 | 关卡编辑器、技能编辑器、数值表校验 | [ ] |
 | T3-13 | CI/CD | GitHub Actions：build/test/viewgen check/形状校验/出包 | [~] 工作流已落地（.github/workflows/ci.yml），出包待补 |
 | T3-14 | 云存档 | IStoragePort 远端实现 + 冲突策略 | [ ] |
@@ -74,7 +74,12 @@
 
 ## 轮次日志（每轮追加，最新在上）
 
-### R7 — 2026-11-20（进行中）
+### R8 — 2026-11-20
+- `RealtimeSceneBinder`：把布场数据变成已登记碰撞体的场景对象（此前战斗场景"能跑但不打架"）
+- PlayMode 测试层：护盾反射真机验证（ReflectedCount≥1）、飞行物 Transform 同步
+- 大厅九场景导航补全（SceneNavigator 复用）；9 场景重新生成 + 装配校验通过
+
+### R7 — 2026-11-20
 - 目标：竞技场场景（T1-5）、放置/抽卡面板场景、确定性回放（T3-6）
 - 已完成：全玩法汇入大厅冒烟（Merge/Idle/TowerDefense/Gacha 同总线协作）、回合内核零分配基线
 - 并行作业：ArenaController/Hud/SceneBuilder、Idle+Gacha Presenter/HUD/Scene、Core.Replay 录制回放
