@@ -103,6 +103,7 @@ namespace AIFramework.Adapters.Console
 
             RunLobbyDemo();
             CartridgeShowcase.Run(_writer);
+            ConsoleServices.RunSelfCheck(_writer);
             PublishBattleFacts();
             CleanupStorage();
 

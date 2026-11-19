@@ -36,8 +36,9 @@ namespace AIFramework.Kernel.Turn.Runner
     /// 只有 <see cref="CollectResult"/> 按胜负分配一次战利品数组。
     /// </para>
     /// <para>
-    /// <b>文件拆分</b>：输入端口（跳跃/下蹲）与它们的"空中拒绝"判定放在 <c>RunnerWorld.Input.cs</c>，
-    /// 本文件只保留状态、只读视图、推进、重开与结算。
+    /// <b>文件拆分</b>：输入端口（跳跃/下蹲）与它们的"空中拒绝"判定放在 <c>RunnerWorld.Input.cs</c>；
+    /// 障碍的生成/后移/回收/碰撞放在 <c>RunnerWorld.Obstacles.cs</c>；本文件只保留状态、只读视图、
+    /// 推进顺序、重开与结算。三者都是同一个 <c>partial</c> 类型，对外只有一个 <c>RunnerWorld</c>。
     /// </para>
     /// </summary>
     public sealed partial class RunnerWorld : IGameplaySession, IRunnerReadView, IRunnerInput
@@ -285,42 +286,13 @@ namespace AIFramework.Kernel.Turn.Runner
             get { return _playerY > 0f || _playerVerticalVelocity > 0f; }
         }
 
-        /// <summary>把所有障碍按当前速度向后推 <paramref name="advance"/> 米，并回收越过 <c>x &lt; -2</c> 的槽位。</summary>
-        private void AdvanceObstacles(float advance)
-        {
-            for (int i = 0; i < _obstacleCount; i++)
-            {
-                _obstacles[i].X -= advance;
-            }
-
-            for (int i = _obstacleCount - 1; i >= 0; i--)
-            {
-                if (_obstacles[i].X < -RunnerRules.RecycleBehindDistance)
-                {
-                    RemoveObstacleAt(i);
-                }
-            }
-        }
-
-        /// <summary>移除槽位并把它后面的障碍整体前移一格，保持"索引 = 生成顺序"。</summary>
-        private void RemoveObstacleAt(int index)
-        {
-            for (int i = index + 1; i < _obstacleCount; i++)
-            {
-                _obstacles[i - 1] = _obstacles[i];
-            }
-
-            _obstacleCount--;
-            _obstacles[_obstacleCount] = default;
-        }
-
         /// <summary>
         /// 跳跃物理：精确匀加速积分 <c>y += v·dt - ½g·dt²</c>、<c>v -= g·dt</c>，
         /// 落地（<c>y ≤ 0</c>）立即归零并清零垂直速度。
         /// <para>
         /// <b>为什么用解析积分而不是 <c>v += a·dt; y += v·dt</c></b>：半隐式欧拉会系统性压低顶点
         /// （1/60 帧下顶点只有 1.003 米，而规则给的 6.5 m/s / 20 m/s² 解析顶点是 1.056 米），
-        /// 会把"跳过 1.0 米"这条判定卡在误差带上；解析式让曲线与规则数值严格一致。
+        /// 会把"跳过 1.0 米"这条判定卡进误差带；解析式让曲线与规则数值严格一致。
         /// </para>
         /// </summary>
         private void AdvanceJumpPhysics(float deltaSeconds)
@@ -354,83 +326,6 @@ namespace AIFramework.Kernel.Turn.Runner
             {
                 _isSliding = false;
                 _slideRemainingSeconds = 0.0;
-            }
-        }
-
-        /// <summary>
-        /// 生成节奏：累加器每攒满 <see cref="RunnerRules.SpawnIntervalSeconds"/> 就生成一个。
-        /// <para>
-        /// 一帧最多补齐 <see cref="RunnerRules.MaxObstacles"/> 个（槽位上限），避免超大 <c>deltaSeconds</c>
-        /// 把 while 循环撑成几百上千次；补齐后累加器若仍溢出，会在后续帧继续补，不会永久卡住。
-        /// </para>
-        /// </summary>
-        private void AdvanceSpawner(double deltaSeconds)
-        {
-            _spawnAccumulatorSeconds += deltaSeconds;
-
-            double dueRatio = _spawnAccumulatorSeconds / RunnerRules.SpawnIntervalSeconds;
-            int due = dueRatio >= RunnerRules.MaxObstacles ? RunnerRules.MaxObstacles : (int)dueRatio;
-            _spawnAccumulatorSeconds -= due * RunnerRules.SpawnIntervalSeconds;
-
-            for (int i = 0; i < due; i++)
-            {
-                SpawnOneObstacle();
-            }
-        }
-
-        /// <summary>在当前距离前方 20 米处放一个障碍；种类由随机源决定（Low 70% / High 30%）；槽位满则放弃。</summary>
-        private void SpawnOneObstacle()
-        {
-            if (_obstacleCount >= RunnerRules.MaxObstacles)
-            {
-                return;
-            }
-
-            RunnerObstacleKind kind = _random.NextPercent() < RunnerRules.LowKindPercent
-                ? RunnerObstacleKind.Low
-                : RunnerObstacleKind.High;
-
-            _obstacles[_obstacleCount] = new RunnerObstacle(
-                _nextObstacleId,
-                _distance + RunnerRules.SpawnAheadDistance,
-                kind);
-
-            _nextObstacleId++;
-            _obstacleCount++;
-        }
-
-        /// <summary>
-        /// 碰撞判定：<c>|x| ≤ 0.6</c> 的障碍逐个检查——Low 要 <c>PlayerY ≥ 1.0</c>、
-        /// High 要正在下蹲，否则判负并给该障碍打上 <see cref="RunnerObstacleView.Hit"/>。
-        /// 同一帧只结算第一个撞上的障碍（其余保持未命中，对局已结束）。
-        /// </summary>
-        private void ResolveCollisions()
-        {
-            for (int i = 0; i < _obstacleCount; i++)
-            {
-                if (Math.Abs(_obstacles[i].X) > RunnerRules.CollisionHalfWidth)
-                {
-                    continue;
-                }
-
-                bool blocked = _obstacles[i].Kind == RunnerObstacleKind.Low
-                    ? _playerY < RunnerRules.LowClearHeight
-                    : !_isSliding;
-
-                if (!blocked)
-                {
-                    continue;
-                }
-
-                _obstacles[i].Hit = true;
-                _gameOver = true;
-
-                if (_bestScore < Score)
-                {
-                    _bestScore = Score;
-                }
-
-                return;
             }
         }
 

@@ -35,8 +35,8 @@ namespace AIFramework.Kernel.Turn.Runner
         /// <summary>碰撞判定半宽（米）：<c>|x| ≤ 0.6</c> 的窗口内逐帧判定。</summary>
         internal const float CollisionHalfWidth = 0.6f;
 
-        /// <summary>跳过多高的地面障碍算安全（米）：<c>PlayerY ≥ 1.0</c> 即越过 Low。</summary>
-        internal const float LowClearHeight = 1f;
+        /// <summary>跳过多高的地面障碍算安全（米）：<c>PlayerY ≥ 0.6</c> 即越过 Low（原 1.0 与跳跃顶点 1.06 几乎等宽，手感不可躲）。</summary>
+        internal const float LowClearHeight = 0.6f;
 
         /// <summary>起跳垂直初速（米/秒）。</summary>
         internal const float JumpVelocity = 6.5f;

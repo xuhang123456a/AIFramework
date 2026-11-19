@@ -89,6 +89,18 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator RhythmScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<RhythmController>("RhythmScene");
+        }
+
+        [UnityTest]
+        public IEnumerator BulletHellScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<BulletHellController>("BulletHellScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");

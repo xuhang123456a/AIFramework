@@ -120,6 +120,12 @@ namespace UnityEngine
         /// <summary>本地缩放。</summary>
         public Vector3 localScale = new Vector3(1f, 1f, 1f);
 
+        /// <summary>
+        /// 世界旋转（<b>追加段</b>，类型见 <c>UnitySceneRigShim.cs</c>）：弹幕射击是俯视玩法，
+        /// 相机必须绕 X 轴转 90° 才能从上往下看战斗平面（X-Z）；没有它战场会缩成一条横线。
+        /// </summary>
+        public Quaternion rotation;
+
         /// <summary>挂到父节点下（形状桩）。</summary>
         public void SetParent(Transform parent)
         {
@@ -341,6 +347,137 @@ namespace UnityEngine
         public UnityException(string message, Exception innerException)
             : base(message, innerException)
         {
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 追加段（T3-10 音频端口）：只补形状，不含任何混音/解码逻辑。
+// 单独再开一个 namespace UnityEngine 块是刻意的——只追加，不改上文既有桩。
+// ---------------------------------------------------------------------------
+namespace UnityEngine
+{
+    /// <summary>
+    /// Behaviour（形状桩）：Unity 真实层级为 Object → Component → Behaviour → MonoBehaviour。
+    /// <para>既有的 <see cref="MonoBehaviour"/> 桩直接继承 <see cref="Component"/>（历史原因，未改动），
+    /// 本类型只服务于新增的 <see cref="AudioSource"/> / <see cref="AudioListener"/> 这类"非可编程组件"。</para>
+    /// </summary>
+    public class Behaviour : Component
+    {
+        /// <summary>组件是否启用（桩：普通字段，真机上禁用会让组件停止接收回调）。</summary>
+        public bool enabled = true;
+    }
+
+    /// <summary>
+    /// 音频剪辑（形状桩）。真机上由导入的 wav/ogg 生成，无法从 <c>byte[]</c> 直接构造，
+    /// 因此本桩只保证"类型存在、可被 <see cref="Resources.Load{T}(string)"/> 泛型约束接受"。
+    /// </summary>
+    public class AudioClip : Object
+    {
+        /// <summary>时长（秒）。</summary>
+        public float length
+        {
+            get { return 0f; }
+        }
+
+        /// <summary>声道数。</summary>
+        public int channels
+        {
+            get { return 1; }
+        }
+
+        /// <summary>采样率。</summary>
+        public int frequency
+        {
+            get { return 44100; }
+        }
+    }
+
+    /// <summary>
+    /// 音频源（形状桩）。<b>桩里的 <see cref="isPlaying"/> 恒为 false</b>：
+    /// 因此离线形状校验能证明"代码编译得过"，但**不能**证明并发音源计数正确——那需要真机。
+    /// </summary>
+    public class AudioSource : Behaviour
+    {
+        /// <summary>当前挂载的剪辑（真机默认 null）。</summary>
+        public AudioClip? clip { get; set; }
+
+        /// <summary>音量（0~1）。</summary>
+        public float volume { get; set; } = 1f;
+
+        /// <summary>音高。</summary>
+        public float pitch { get; set; } = 1f;
+
+        /// <summary>是否循环（BGM 用）。</summary>
+        public bool loop { get; set; }
+
+        /// <summary>是否唤醒即播（框架一律显式关闭，避免"没调用却出声"）。</summary>
+        public bool playOnAwake { get; set; } = true;
+
+        /// <summary>是否静音。</summary>
+        public bool mute { get; set; }
+
+        /// <summary>2D/3D 混合（0 = 纯 2D）。</summary>
+        public float spatialBlend { get; set; }
+
+        /// <summary>衰减起始距离。</summary>
+        public float minDistance { get; set; } = 1f;
+
+        /// <summary>衰减结束距离。</summary>
+        public float maxDistance { get; set; } = 500f;
+
+        /// <summary>是否正在播放（桩恒为 false）。</summary>
+        public bool isPlaying
+        {
+            get { return false; }
+        }
+
+        /// <summary>播放当前 <see cref="clip"/>。</summary>
+        public void Play()
+        {
+        }
+
+        /// <summary>停止播放。</summary>
+        public void Stop()
+        {
+        }
+
+        /// <summary>暂停播放。</summary>
+        public void Pause()
+        {
+        }
+
+        /// <summary>叠加播放一次（不改变 <see cref="clip"/>）。</summary>
+        public void PlayOneShot(AudioClip clip)
+        {
+        }
+
+        /// <summary>按音量比例叠加播放一次。</summary>
+        public void PlayOneShot(AudioClip clip, float volumeScale)
+        {
+        }
+    }
+
+    /// <summary>
+    /// 音频监听器（形状桩）：场景里通常只有一个，<see cref="volume"/> 是全局总音量。
+    /// 框架用它的静态音量承载 Master 通道，避免每条音源各乘一次 Master。
+    /// </summary>
+    public class AudioListener : Behaviour
+    {
+        /// <summary>全局音量（0~1）。</summary>
+        public static float volume = 1f;
+
+        /// <summary>全局暂停。</summary>
+        public static bool pause;
+    }
+
+    /// <summary>音频设置（形状桩）：真机上只读，由平台/工程设置决定。</summary>
+    public static class AudioSettings
+    {
+        /// <summary>输出采样率。</summary>
+        public static int outputSampleRate
+        {
+            get { return 48000; }
         }
     }
 }

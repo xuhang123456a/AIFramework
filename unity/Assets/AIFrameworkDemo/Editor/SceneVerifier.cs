@@ -58,6 +58,8 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/PuzzleScene.unity", typeof(PuzzleController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TetrisScene.unity", typeof(TetrisController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/AutoChessScene.unity", typeof(AutoChessController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/RhythmScene.unity", typeof(RhythmController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/BulletHellScene.unity", typeof(BulletHellController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 
