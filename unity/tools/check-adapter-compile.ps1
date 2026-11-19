@@ -39,6 +39,8 @@ New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 try {
     $projectPath = Join-Path $tempRoot 'adapter-shape-check.csproj'
     $runtimeGlob = ($adapterRuntime -replace '\\', '/') + '/**/*.cs'
+    $editorRoot = Join-Path $repoRoot 'unity/Assets'
+    $editorRootGlob = ($editorRoot -replace '\\', '/') + '/**/Editor/**/*.cs'
     $shimGlob = ($shimDir -replace '\\', '/') + '/*.cs'
     $srcRoot = (Join-Path $repoRoot 'src') -replace '\\', '/'
 
@@ -56,6 +58,7 @@ try {
   <ItemGroup>
     <Compile Include="$shimGlob" />
     <Compile Include="$runtimeGlob" />
+    <Compile Include="$editorRootGlob" Exclude="$repoRoot/unity/Assets/Editor/AnalyzerLabelInstaller.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$srcRoot/AIFramework.Contracts/AIFramework.Contracts.csproj" />
@@ -85,3 +88,5 @@ finally {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
+
+

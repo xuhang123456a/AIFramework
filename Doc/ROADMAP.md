@@ -74,6 +74,11 @@
 
 ## 轮次日志（每轮追加，最新在上）
 
+### R3 — 2026-11-20（进行中）
+- 目标：Unity 场景层落地（大厅场景可点）、离线编译校验扩展到编辑器脚本
+- 完成：`SignInHud`/`ShopHud`/`QuestHud`/`MailHud` 四个视图皮肤 + `LobbyController`；`LobbySceneBuilder` 一键建场景（Canvas/四面板/按钮/引用注入）；形状桩扩到 UnityEngine.UI / UnityEditor，`check-adapter-compile.ps1` 现在同时编译 `unity/Assets/**/Editor/**`
+- 下轮：Boot 场景 + SceneDirector（T1-1/T3-4）；卡牌回合内核通用化（T1-3）
+
 ### R2 — 2026-11-20
 - 目标：兑现切片提的 Contracts 缺口；三个面板 Presenter + 视图契约 + 绑定描述；Unity 大厅装配
 - 完成：

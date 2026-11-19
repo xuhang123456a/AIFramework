@@ -24,6 +24,18 @@ namespace UnityEngine
         public Transform transform = new Transform();
 
         public GameObject gameObject = new GameObject();
+
+        /// <summary>取自身或子节点上的组件（形状桩）。</summary>
+        public T? GetComponent<T>() where T : Component
+        {
+            return null;
+        }
+
+        /// <summary>取子节点上的组件（形状桩）。</summary>
+        public T? GetComponentInChildren<T>() where T : Component
+        {
+            return null;
+        }
     }
 
     public class GameObject : Object
@@ -32,21 +44,135 @@ namespace UnityEngine
 
         public bool activeSelf { get; private set; } = true;
 
+        public GameObject()
+        {
+        }
+
+        public GameObject(string name)
+        {
+            this.name = name;
+        }
+
+        public GameObject(string name, params Type[] components)
+        {
+            this.name = name;
+        }
+
+        /// <summary>创建内置图元（形状桩：返回空对象，没有任何网格与碰撞体）。</summary>
+        public static GameObject CreatePrimitive(PrimitiveType type)
+        {
+            return new GameObject(type.ToString());
+        }
+
         public void SetActive(bool value) { activeSelf = value; }
+
+        /// <summary>取自身或子节点上的组件（形状桩，永远返回 null，只保证能编译）。</summary>
+        public T? GetComponent<T>() where T : Component
+        {
+            return null;
+        }
+
+        /// <summary>取子节点上的组件（形状桩）。</summary>
+        public T? GetComponentInChildren<T>() where T : Component
+        {
+            return null;
+        }
+
+        /// <summary>加组件（形状桩）。</summary>
+        public T AddComponent<T>() where T : Component, new()
+        {
+            return new T();
+        }
     }
 
     public class Transform : Component
     {
         public Vector3 position;
+
+        /// <summary>本地位置。</summary>
+        public Vector3 localPosition;
+
+        /// <summary>本地缩放。</summary>
+        public Vector3 localScale = new Vector3(1f, 1f, 1f);
+
+        /// <summary>挂到父节点下（形状桩）。</summary>
+        public void SetParent(Transform parent)
+        {
+        }
+
+        /// <summary>挂到父节点下（UI 用法：不保留世界坐标）。</summary>
+        public void SetParent(Transform parent, bool worldPositionStays)
+        {
+        }
     }
 
     public class Collider : Component
     {
     }
 
-    public class MonoBehaviour : Object
+    /// <summary>MonoBehaviour 继承链：Object → Component → Behaviour → MonoBehaviour（Unity 真实层级）。</summary>
+    public class MonoBehaviour : Component
     {
         public bool enabled = true;
+    }
+
+    /// <summary>颜色（RGBA 0~1）。</summary>
+    public struct Color
+    {
+        public float r;
+        public float g;
+        public float b;
+        public float a;
+
+        public Color(float r, float g, float b, float a)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+    }
+
+    /// <summary>内置图元类型。</summary>
+    public enum PrimitiveType
+    {
+        Sphere = 0,
+        Capsule = 1,
+        Cylinder = 2,
+        Cube = 3,
+        Plane = 4,
+        Quad = 5
+    }
+
+    /// <summary>相机（形状桩）。</summary>
+    public class Camera : MonoBehaviour
+    {
+        /// <summary>清屏标志（桩）。</summary>
+        public int clearFlags;
+
+        /// <summary>是否正交。</summary>
+        public bool orthographic;
+    }
+
+    /// <summary>字体资产（形状桩）。</summary>
+    public class Font : Object
+    {
+    }
+
+    /// <summary>资源加载（桩：只支持内置资源，返回空对象）。</summary>
+    public static class Resources
+    {
+        /// <summary>取内置资源。</summary>
+        public static T Load<T>(string path) where T : Object, new()
+        {
+            return new T();
+        }
+
+        /// <summary>取内置资源（泛型）。</summary>
+        public static T GetBuiltinResource<T>(string path) where T : Object, new()
+        {
+            return new T();
+        }
     }
 
     public struct Vector2
@@ -55,6 +181,18 @@ namespace UnityEngine
         public float y;
 
         public Vector2(float x, float y) { this.x = x; this.y = y; }
+
+        /// <summary>零向量。</summary>
+        public static Vector2 zero
+        {
+            get { return new Vector2(0f, 0f); }
+        }
+
+        /// <summary>单位向量。</summary>
+        public static Vector2 one
+        {
+            get { return new Vector2(1f, 1f); }
+        }
     }
 
     public struct Vector3
@@ -128,6 +266,12 @@ namespace UnityEngine
     {
     }
 }
+
+
+
+
+
+
 
 
 

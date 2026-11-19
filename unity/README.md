@@ -60,6 +60,15 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 
 四个面板（签到 / 商店 / 任务 / 邮件）的视图契约与绑定皮肤都由 `tools/viewgen` 生成：`I<Panel>View.g.cs`（纯逻辑侧）+ `<Panel>ViewBinder.g.cs`（`Runtime/Views/`）。改 UI 先改 `*.bindings.json` 再重新生成，Presenter 与测试不动。
 
+## 二之四、大厅场景（一键生成）
+
+菜单 **AIFramework → 创建大厅场景**，生成 `Assets/AIFrameworkDemo/Scenes/LobbyScene.unity`：Canvas + 签到/商店/任务/邮件四个面板 + `LobbyController`。
+
+- 场景由编辑器脚本建（`unity/Assets/AIFrameworkDemo/Editor/LobbySceneBuilder.cs`），AI 不碰 `.unity` YAML；
+- 运行时 `LobbyController` 自己 `new AIFrameworkUnityHost()` 并装配四个 Presenter，控件引用在生成时已喂好；
+- 按 Play 后：点"领取今天"走签到切片，点商品买走商店切片（先扣后给），点"打一场"跑一轮 Realtime 内核并把 `GameFinishedEvent` 喂给任务切片；
+- 子表缺失时对应面板自动降级（Console 会打 `[AIFramework] xxx 装配失败`），不影响其它面板。
+
 ## 三、把编译守卫接进 Unity（可选，默认不装）
 
 纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。
@@ -79,7 +88,7 @@ pwsh unity/tools/setup-analyzer.ps1 -Remove  # 移除
 pwsh unity/tools/check-adapter-compile.ps1
 ```
 
-它把 `src/Adapters/AIFramework.Adapters.Unity/Runtime/**` 连同 `unity/tools/shims/` 里的 UnityEngine 形状桩，按 `netstandard2.1 + TreatWarningsAsErrors` 编译一遍。能拦住语法/类型/接口实现缺成员/API 形状写错；**拦不住运行时行为**（桩里的 `Physics`、`Debug`、`Time` 全是空实现）。新增 Unity API 时要同步补桩。
+它把 `src/Adapters/AIFramework.Adapters.Unity/Runtime/**` **以及 `unity/Assets/**/Editor/**` 的编辑器脚本**，连同 `unity/tools/shims/` 里的 UnityEngine / UnityEngine.UI / UnityEditor 形状桩，按 `netstandard2.1 + TreatWarningsAsErrors` 编译一遍。能拦住语法/类型/接口实现缺成员/API 形状写错；**拦不住运行时行为**（桩里的 `Physics`、`Debug`、`AssetDatabase` 全是空实现）。新增 Unity API 时要同步补桩。
 
 ## 四、已知限制（按优先级）
 
