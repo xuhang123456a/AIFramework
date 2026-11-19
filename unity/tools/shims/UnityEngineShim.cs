@@ -269,6 +269,13 @@ namespace UnityEngine
         public static float deltaTime;
 
         public static double realtimeSinceStartupAsDouble;
+
+        /// <summary>
+        /// 不受 <c>Time.timeScale</c> 影响的帧间隔（<b>追加桩</b>，T3-11 帧耗时基线用）：
+        /// 帧耗时采样与 HUD 节流必须用它——<c>timeScale = 0</c> 时 <c>deltaTime</c> 变 0，
+        /// 会把"暂停"洗成"0ms 完美帧"。真实 Unity 里它是只读属性，桩做成字段，因为离线校验只关心符号形状。
+        /// </summary>
+        public static float unscaledDeltaTime;
     }
 
     public static class Application
