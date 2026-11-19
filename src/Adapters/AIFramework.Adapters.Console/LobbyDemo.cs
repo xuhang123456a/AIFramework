@@ -3,10 +3,14 @@ using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Ports;
 using AIFramework.Core.Save;
+using AIFramework.Features.Gacha;
+using AIFramework.Features.IdleTycoon;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Mail;
+using AIFramework.Features.Merge;
 using AIFramework.Features.Quest;
 using AIFramework.Features.Shop;
+using AIFramework.Features.TowerDefense;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,17 +27,22 @@ namespace AIFramework.Adapters.Console
     public sealed class LobbyDemo
     {
         /// <summary>演示用初始金币。</summary>
-        private const int InitialGold = 1000;
+        private const int InitialGold = 2000;
 
         private readonly IIOWriter _writer;
         private readonly ICqeBus _bus;
-        private readonly ITimeProvider _time;
+        private readonly SystemTimeProvider _time;
         private readonly IBinaryTableLoader _tables;
         private readonly IStoragePort _storage;
 
         private readonly InventoryHandler _inventory;
         private readonly Core.Meta.RedDotTree _redDots;
         private readonly Core.Ui.PopupQueue _popups;
+
+        private MergeHandler? _merge;
+        private GachaHandler? _gacha;
+        private IdleTycoonHandler? _idle;
+        private TowerDefenseHandler? _towerDefense;
 
         /// <summary>
         /// 背包与红点由装配入口创建并注入：它们是多切片共享的底座，
@@ -42,7 +51,7 @@ namespace AIFramework.Adapters.Console
         public LobbyDemo(
             IIOWriter writer,
             ICqeBus bus,
-            ITimeProvider time,
+            SystemTimeProvider time,
             IBinaryTableLoader tables,
             IStoragePort storage,
             InventoryHandler inventory,
@@ -72,6 +81,19 @@ namespace AIFramework.Adapters.Console
             mail.Register(_bus);
             mail.SeedRedDot(_bus);
 
+            // 其余玩法切片：注册进同一总线，证明"多玩法共存于同一主板"不是口号。
+            _merge = new MergeHandler(_bus, _tables);
+            _merge.Register(_bus);
+
+            _gacha = new GachaHandler(_bus, new XorShiftRandomSource(20261120), _tables);
+            _gacha.Register(_bus);
+
+            _idle = new IdleTycoonHandler(_bus, _time, _tables);
+            _idle.Register(_bus);
+
+            _towerDefense = new TowerDefenseHandler(_bus, _tables);
+            _towerDefense.Register(_bus);
+
             _inventory.Seed(MetaItemIds.Gold, InitialGold);
             _inventory.Seed(MetaItemIds.RetroactiveCard, 0);
         }
@@ -87,6 +109,7 @@ namespace AIFramework.Adapters.Console
             SimulateMailFlow();
             SimulatePopupQueue();
             ReportRedDots();
+            SimulateOtherGenres();
             RunSaveRoundTrip();
         }
 
@@ -176,6 +199,122 @@ namespace AIFramework.Adapters.Console
 
             _writer.WriteLine("[Popup] 出队顺序=" + string.Join(" → ", order) + "，剩余=" + _popups.Count
                 + "，丢弃=" + _popups.DroppedCount);
+        }
+
+        /// <summary>
+        /// 其余玩法切片冒烟：合成 / 抽卡 / 放置经营 / 塔防建造。
+        /// <b>为什么都放在大厅里跑</b>：它们只依赖 CQE 总线与 Contracts 端口、不需要单独的内核会话，
+        /// 正好验证"Meta 类玩法能零成本叠在同一个后台上"。
+        /// </summary>
+        private void SimulateOtherGenres()
+        {
+            SimulateMerge();
+            SimulateIdle();
+            SimulateTowerDefense();
+            SimulateGacha();
+        }
+
+        private void SimulateMerge()
+        {
+            MergeHandler? merge = _merge;
+            if (merge == null)
+            {
+                _writer.WriteLine("[Merge] 切片未装配，跳过。");
+                return;
+            }
+
+            _bus.Send(new SpawnItemCommand(0, 0, 1));
+            _bus.Send(new SpawnItemCommand(1, 0, 1));
+            _bus.Send(new MergeCellsCommand(0, 0, 1, 0));
+
+            var query = new MergeGridQueryRequest();
+            MergeGridSnapshot grid = _bus.Query<MergeGridQueryRequest, MergeGridSnapshot>(in query);
+            _writer.WriteLine("[Merge] (1,0) 等级=" + grid.LevelAt(1, 0)
+                + "，已用格=" + grid.UsedCellCount + "，合成次数=" + merge.MergeCount
+                + "，金币=" + _inventory.GetCount(MetaItemIds.Gold));
+        }
+
+        private void SimulateGacha()
+        {
+            GachaHandler? gacha = _gacha;
+            if (gacha == null)
+            {
+                _writer.WriteLine("[Gacha] 切片未装配，跳过。");
+                return;
+            }
+
+            _bus.Send(new DrawGachaCommand(1));
+            _writer.WriteLine("[Gacha] 单抽=" + DescribeGachaResult(gacha.LastResult)
+                + "，保底计数=" + gacha.PityCounter + "，金币=" + _inventory.GetCount(MetaItemIds.Gold));
+
+            _bus.Send(new DrawGachaCommand(10));
+            _writer.WriteLine("[Gacha] 十连=" + DescribeGachaResult(gacha.LastResult)
+                + "，保底计数=" + gacha.PityCounter + "，金币=" + _inventory.GetCount(MetaItemIds.Gold));
+        }
+
+        private void SimulateIdle()
+        {
+            IdleTycoonHandler? idle = _idle;
+            if (idle == null)
+            {
+                _writer.WriteLine("[Idle] 切片未装配，跳过。");
+                return;
+            }
+
+            _bus.Send(new UpgradeBuildingCommand(1));
+            int level = idle.GetLevel(1);
+            int income = idle.IncomePerSecond;
+
+            // 推进 30 秒后结算离线收益（时间源是注入的，测试/演示都可控）。
+            _time.Advance(30d);
+            int collected = idle.SettleOfflineIncome();
+
+            _writer.WriteLine("[Idle] 建筑1 等级=" + level + "，收入/秒=" + income
+                + "，结算 30 秒收益=" + collected + "，金币=" + _inventory.GetCount(MetaItemIds.Gold));
+        }
+
+        private void SimulateTowerDefense()
+        {
+            TowerDefenseHandler? towers = _towerDefense;
+            if (towers == null)
+            {
+                _writer.WriteLine("[TowerDefense] 切片未装配，跳过。");
+                return;
+            }
+
+            _bus.Send(new BuildTowerCommand(0, 0, 1));
+            _bus.Send(new BuildTowerCommand(0, 0, 2)); // 同一格重复建造应被静默拒绝
+
+            var query = new TowerLayoutQueryRequest();
+            TowerLayoutSnapshot layout = _bus.Query<TowerLayoutQueryRequest, TowerLayoutSnapshot>(in query);
+            _writer.WriteLine("[TowerDefense] (0,0)=" + layout.TowerIdAt(0, 0)
+                + "，塔数=" + layout.TowerCount + "，金币=" + _inventory.GetCount(MetaItemIds.Gold));
+        }
+
+        private static string DescribeGachaResult(GachaResult? result)
+        {
+            if (result == null)
+            {
+                return "无";
+            }
+
+            var builder = new System.Text.StringBuilder();
+            GachaResultItem[] items = result.Items;
+            for (int i = 0; i < items.Length; i++)
+            {
+                if (i > 0)
+                {
+                    builder.Append(' ');
+                }
+
+                builder.Append(items[i].ItemId);
+                if (items[i].IsRare)
+                {
+                    builder.Append("(稀有)");
+                }
+            }
+
+            return builder.ToString();
         }
 
         private void ReportRedDots()

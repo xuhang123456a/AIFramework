@@ -39,6 +39,9 @@ namespace AIFramework.Fixtures
                 WriteQuest(target);
                 WriteMail(target);
                 WriteCard(target);
+                WriteBuilding(target);
+                WriteGachaPool(target);
+                WriteMergeItem(target);
                 WriteTower(target);
                 Console.WriteLine("已生成夹具：" + Path.GetFullPath(target));
             }
@@ -159,6 +162,66 @@ namespace AIFramework.Fixtures
                 writer.Write(cost);
                 writer.Write(damage);
                 writer.Write(range);
+            });
+        }
+
+        private static void WriteBuilding(string directory)
+        {
+            // TbBuilding: row{buildingId, baseIncome, upgradeCost, maxLevel} —— 16 字节/行
+            var rows = new List<(int BuildingId, int BaseIncome, int UpgradeCost, int MaxLevel)>
+            {
+                (1, 5, 100, 5),
+                (2, 12, 250, 5),
+                (3, 30, 600, 3)
+            };
+
+            WriteTable(Path.Combine(directory, "TbBuilding.bin"), rows.Count, (writer, index) =>
+            {
+                (int buildingId, int baseIncome, int upgradeCost, int maxLevel) = rows[index];
+                writer.Write(buildingId);
+                writer.Write(baseIncome);
+                writer.Write(upgradeCost);
+                writer.Write(maxLevel);
+            });
+        }
+
+        private static void WriteGachaPool(string directory)
+        {
+            // TbGachaPool: row{itemId, weight, isRare} —— 12 字节/行（稀有 9001 / 普通 2001,2002）
+            var rows = new List<(int ItemId, int Weight, int IsRare)>
+            {
+                (2001, 70, 0),
+                (2002, 29, 0),
+                (9001, 1, 1)
+            };
+
+            WriteTable(Path.Combine(directory, "TbGachaPool.bin"), rows.Count, (writer, index) =>
+            {
+                (int itemId, int weight, int isRare) = rows[index];
+                writer.Write(itemId);
+                writer.Write(weight);
+                writer.Write(isRare);
+            });
+        }
+
+        private static void WriteMergeItem(string directory)
+        {
+            // TbMergeItem: row{level, itemId, sellGold} —— 12 字节/行，level 必须从 1 连续
+            var rows = new List<(int Level, int ItemId, int SellGold)>
+            {
+                (1, 3001, 10),
+                (2, 3002, 30),
+                (3, 3003, 70),
+                (4, 3004, 150),
+                (5, 3005, 300)
+            };
+
+            WriteTable(Path.Combine(directory, "TbMergeItem.bin"), rows.Count, (writer, index) =>
+            {
+                (int level, int itemId, int sellGold) = rows[index];
+                writer.Write(level);
+                writer.Write(itemId);
+                writer.Write(sellGold);
             });
         }
 
