@@ -7,7 +7,7 @@ using AIFramework.Contracts.Gameplay.Turn;
 namespace AIFramework.Kernel.Turn.Puzzle
 {
     /// <summary>
-    /// 解谜沙盒（推箱子，<see cref="GameplayKernelType.Turn"/>）：Kernel.Turn 的第五套内容，
+    /// 解谜沙盒（推箱子，<see cref="GameplayKernelType.Puzzle"/>）：Kernel.Turn 的第五套内容，
     /// 验证"零引擎依赖的纯数据网格解谜"也能挂进同一套回合进出门。
     /// <para>
     /// <b>为什么复用 Turn 卡带</b>：推箱子对主板而言只是"另一个回合制会话"——进门拿
@@ -297,7 +297,7 @@ namespace AIFramework.Kernel.Turn.Puzzle
 
         /// <summary>
         /// 取回结算报告：未解出或第二次调用一律抛 <see cref="InvalidOperationException"/>。
-        /// 固定报 <see cref="GameplayKernelType.Turn"/> + 必胜，<see cref="GameplayResult.StepCount"/> 取
+        /// 固定报 <see cref="GameplayKernelType.Puzzle"/> + 必胜，<see cref="GameplayResult.StepCount"/> 取
         /// <see cref="StepCount"/>，<see cref="GameplayResult.RemainingUnits"/> 取 <see cref="Moves"/>
         /// （解谜没有兵力/剩余资源，这里复用该字段承载"最优步数对比"用的实际步数），
         /// 战利品固定 <c>new LootItem(1003, 1)</c>。
@@ -322,7 +322,7 @@ namespace AIFramework.Kernel.Turn.Puzzle
             };
 
             return new GameplayResult(
-                GameplayKernelType.Turn,
+                GameplayKernelType.Puzzle,
                 true,
                 _stepCount,
                 _moves,

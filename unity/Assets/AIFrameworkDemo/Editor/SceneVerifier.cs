@@ -55,6 +55,7 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/ArenaScene.unity", typeof(ArenaController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/IdleScene.unity", typeof(IdlePanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/GachaScene.unity", typeof(GachaPanelController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/PuzzleScene.unity", typeof(PuzzleController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 

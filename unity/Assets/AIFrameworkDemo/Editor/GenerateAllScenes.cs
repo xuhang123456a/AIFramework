@@ -32,6 +32,7 @@ namespace AIFramework.Demo.Editor
             ArenaSceneBuilder.CreateArenaScene();
             IdleSceneBuilder.CreateIdleScene();
             GachaSceneBuilder.CreateGachaScene();
+            PuzzleSceneBuilder.CreatePuzzleScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），

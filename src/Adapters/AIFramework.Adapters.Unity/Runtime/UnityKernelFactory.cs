@@ -8,6 +8,9 @@ using AIFramework.Kernel.Realtime;
 using AIFramework.Kernel.Turn;
 using AIFramework.Kernel.Turn.CardBattle;
 using AIFramework.Kernel.Turn.Match3;
+using AIFramework.Kernel.Turn.Puzzle;
+using AIFramework.Kernel.Turn.Tetris;
+using AIFramework.Kernel.Turn.AutoChess;
 
 namespace AIFramework.Adapters.Unity
 {
@@ -88,6 +91,21 @@ namespace AIFramework.Adapters.Unity
             if (type == GameplayKernelType.Match3)
             {
                 return new Match3World(in init);
+            }
+
+            if (type == GameplayKernelType.Puzzle)
+            {
+                return new PuzzleWorld(in init);
+            }
+
+            if (type == GameplayKernelType.Tetris)
+            {
+                return new TetrisWorld(in init);
+            }
+
+            if (type == GameplayKernelType.AutoChess)
+            {
+                return new AutoChessWorld(in init);
             }
 
             return new TurnWorld(in init);

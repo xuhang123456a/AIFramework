@@ -7,7 +7,7 @@ using AIFramework.Contracts.Gameplay.Turn;
 namespace AIFramework.Kernel.Turn.AutoChess
 {
     /// <summary>
-    /// 自走棋沙盒（<see cref="GameplayKernelType.Turn"/>）：Kernel.Turn 的第六套内容，
+    /// 自走棋沙盒（<see cref="GameplayKernelType.AutoChess"/>）：Kernel.Turn 的第六套内容，
     /// 验证"确定性模拟 + 阵容构筑"能挂在同一套回合进出门上。
     /// <para>
     /// <b>为什么不新增 <c>GameplayKernelType</c> 枚举值</b>：自走棋对主板而言只是"另一个回合制会话"——
@@ -202,7 +202,11 @@ namespace AIFramework.Kernel.Turn.AutoChess
 
         /// <summary>
         /// 把备战席单位放到己方半场第一个空格（扫描顺序 <c>y</c> 0→3、每行 <c>x</c> 0→7）。
-        /// 单位不存在 / 非己方 / 已在场 / 已阵亡 / 无空格返回 false，且不改任何状态。
+        /// 单位不存在 / 非己方 / 已在场 / 已阵亡 / 无空格 / 对局已结束返回 false，且不改任何状态。
+        /// <para>
+        /// 契约没有"开战后禁止布阵"这一条，因此本轮结算后到 <see cref="EndRound"/> 之前仍可调用；
+        /// 但 <see cref="EndRound"/> 会把所有存活单位收回备战席，残留布阵不会带进下一轮，也就不构成优势。
+        /// </para>
         /// </summary>
         public bool TryPlace(int unitId)
         {
@@ -326,7 +330,7 @@ namespace AIFramework.Kernel.Turn.AutoChess
                 : Array.Empty<LootItem>();
 
             return new GameplayResult(
-                GameplayKernelType.Turn,
+                GameplayKernelType.AutoChess,
                 _victory,
                 _processedSteps,
                 _board.CountOwner(AutoChessRules.PlayerOwner),

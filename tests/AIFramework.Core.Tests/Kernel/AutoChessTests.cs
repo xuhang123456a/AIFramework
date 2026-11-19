@@ -287,6 +287,7 @@ namespace AIFramework.Core.Tests.Kernel
         public void TrySell_RemovesUnitFromArmyAndFreesCell()
         {
             AutoChessWorld world = CreateWorld(3);
+            Assert.True(world.TryPlace(PlayerUnitId));
             Assert.True(world.TryPlace(SecondPlayerUnitId));
             Assert.Equal(1, world.UnitAt(1, 0));
 
@@ -338,8 +339,8 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(InitialBaseHp - BaseHpPerRound, world.EnemyHp);
 
             // 3v3 正面对撞：玩家 20 攻击 × 4 击打空 80 血的敌人，己方各挨 4 下 12 点伤害。
-            Assert.Equal(0, CountAlive(world, 1));
-            Assert.Equal(3, CountAlive(world, 0));
+            Assert.Equal(0, CountOnBoardAlive(world, 1));
+            Assert.Equal(3, CountOnBoardAlive(world, 0));
             for (int i = 0; i < 3; i++)
             {
                 Assert.Equal(PlayerUnitHp - (4 * EnemyUnitAttack), world.GetUnit(i).Hp);
@@ -364,7 +365,7 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(InitialBaseHp, world.EnemyHp);
 
             // 没上场的敌人毫发无损，站位也没变。
-            Assert.Equal(3, CountAlive(world, 1));
+            Assert.Equal(3, CountOnBoardAlive(world, 1));
             for (int j = 0; j < 3; j++)
             {
                 ChessUnitView enemy = world.GetUnit(3 + j);
@@ -401,12 +402,8 @@ namespace AIFramework.Core.Tests.Kernel
             AutoChessWorld second = CreateWorld(3);
 
             // 非对称布阵：把两个单位挪到"两轴都要缩短"的格子上，逼随机走位真的参与决策。
-            foreach (AutoChessWorld world in new[] { first, second })
-            {
-                PlaceAll(world, 3);
-                Assert.True(world.TryMoveUnit(PlayerUnitId, 5, 3));
-                Assert.True(world.TryMoveUnit(SecondPlayerUnitId, 3, 2));
-            }
+            PlaceAsymmetric(first);
+            PlaceAsymmetric(second);
 
             first.StartBattle();
             second.StartBattle();
@@ -446,8 +443,8 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(0, world.Wins);
             Assert.Equal(1, world.Losses);
             Assert.Equal(InitialBaseHp - BaseHpPerRound, world.PlayerHp);
-            Assert.Equal(0, CountAlive(world, 0));
-            Assert.True(CountAlive(world, 1) > 0);
+            Assert.Equal(0, CountOnBoardAlive(world, 0));
+            Assert.True(CountOnBoardAlive(world, 1) > 0);
         }
 
         // ── 回合推进 ────────────────────────────────────────────────────
@@ -479,7 +476,7 @@ namespace AIFramework.Core.Tests.Kernel
 
             // 敌方重新生成 3 个单位，满血站在敌方半场头三格。
             Assert.Equal(3, world.EnemyUnitCount);
-            Assert.Equal(3, CountAlive(world, 1));
+            Assert.Equal(3, CountOnBoardAlive(world, 1));
             for (int j = 0; j < 3; j++)
             {
                 ChessUnitView enemy = world.GetUnit(3 + j);
@@ -526,7 +523,7 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(RoundsToKillBase, world.RoundIndex);
 
             GameplayResult result = world.CollectResult();
-            Assert.Equal(GameplayKernelType.Turn, result.KernelType);
+            Assert.Equal(GameplayKernelType.AutoChess, result.KernelType);
             Assert.False(result.IsVictory);
             Assert.Empty(result.Loots);
 
@@ -553,7 +550,7 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(0, world.Losses);
 
             GameplayResult result = world.CollectResult();
-            Assert.Equal(GameplayKernelType.Turn, result.KernelType);
+            Assert.Equal(GameplayKernelType.AutoChess, result.KernelType);
             Assert.True(result.IsVictory);
             Assert.Equal(3, result.RemainingUnits);
             Assert.Empty(result.TriggeredTags);
@@ -634,15 +631,20 @@ namespace AIFramework.Core.Tests.Kernel
 
             Assert.Equal(5, world.ProcessedSteps);
 
-            // Step 不参与战斗推演：开战后单位不会因为 Step 而移动。
+            // Step 不参与战斗推演，也不会挪动已布阵的单位：它只累加计数。
             PlaceAll(world, 3);
             world.Step(1f / 60f);
             Assert.Equal(6, world.ProcessedSteps);
             Assert.Equal(0, world.GetUnit(0).X);
             Assert.Equal(0, world.GetUnit(0).Y);
 
-            for (int round = 0; round < RoundsToKillBase; round++)
+            // 第一轮沿用上面已经布好的阵；之后每轮 EndRound 都会把单位送回备战席，需要重新布阵。
+            world.StartBattle();
+            world.EndRound();
+
+            for (int round = 1; round < RoundsToKillBase; round++)
             {
+                PlaceAll(world, 3);
                 world.StartBattle();
                 world.EndRound();
             }
@@ -703,11 +705,54 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.Equal(0L, allocated);
         }
 
+        [Fact]
+        public void StartBattle_DifferentSeeds_DivergeInWalkAndDamage()
+        {
+            // 同样的非对称布阵、同样的规则，只换种子：走位与残血必须出现差异。
+            // 若这条也全等，说明随机源根本没被消费，"确定性"就退化成了"没有随机"。
+            AutoChessWorld first = CreateWorld(3, 1);
+            AutoChessWorld second = CreateWorld(3, 3);
+
+            PlaceAsymmetric(first);
+            PlaceAsymmetric(second);
+
+            first.StartBattle();
+            second.StartBattle();
+
+            bool diverged = first.PlayerHp != second.PlayerHp
+                || first.EnemyHp != second.EnemyHp
+                || first.Wins != second.Wins
+                || first.Losses != second.Losses;
+
+            int slots = first.PlayerUnitCount + first.EnemyUnitCount;
+            int otherSlots = second.PlayerUnitCount + second.EnemyUnitCount;
+            int shared = slots < otherSlots ? slots : otherSlots;
+
+            for (int i = 0; i < shared && !diverged; i++)
+            {
+                ChessUnitView a = first.GetUnit(i);
+                ChessUnitView b = second.GetUnit(i);
+                diverged = a.UnitId != b.UnitId
+                    || a.X != b.X
+                    || a.Y != b.Y
+                    || a.Hp != b.Hp
+                    || a.Alive != b.Alive;
+            }
+
+            Assert.True(diverged, "换种子后战斗过程完全一致，随机走位没有生效。");
+        }
+
         // ── 辅助 ────────────────────────────────────────────────────────
 
         private static AutoChessWorld CreateWorld(int unitCount)
         {
-            return new AutoChessWorld(new GameplayInitData(1, DefaultSeed, unitCount));
+            return CreateWorld(unitCount, DefaultSeed);
+        }
+
+        /// <summary>指定随机种子的会话：用于验证"同种子同结局 / 换种子换走位"。</summary>
+        private static AutoChessWorld CreateWorld(int unitCount, int seed)
+        {
+            return new AutoChessWorld(new GameplayInitData(1, seed, unitCount));
         }
 
         /// <summary>把 1..<paramref name="count"/> 号单位依次放上己方半场（落点由内核选第一个空格）。</summary>
@@ -737,10 +782,33 @@ namespace AIFramework.Core.Tests.Kernel
             return alive;
         }
 
-        /// <summary>当前玩家槽位数：测试里只作自检，避免把计数上限写死。</summary>
-        private static int PlayerUnitCountOf(AutoChessWorld world)
+        /// <summary>数某阵营"在棋盘上且存活"的单位：备战席单位不算，用来判全灭。</summary>
+        private static int CountOnBoardAlive(AutoChessWorld world, int owner)
         {
-            return world.PlayerUnitCount;
+            int slots = world.PlayerUnitCount + world.EnemyUnitCount;
+            int alive = 0;
+
+            for (int i = 0; i < slots; i++)
+            {
+                ChessUnitView unit = world.GetUnit(i);
+                if (unit.Owner == owner && unit.Alive && unit.X >= 0)
+                {
+                    alive++;
+                }
+            }
+
+            return alive;
+        }
+
+        /// <summary>
+        /// 满编上场后把两个单位挪离所在行：3 号留在 <c>(2,0)</c>，1 号去 <c>(5,3)</c>、2 号去 <c>(3,2)</c>。
+        /// 这样每个单位与最近敌人的 x / y 都不相等，走位必须由随机源裁决。
+        /// </summary>
+        private static void PlaceAsymmetric(AutoChessWorld world)
+        {
+            PlaceAll(world, 3);
+            Assert.True(world.TryMoveUnit(PlayerUnitId, 5, 3));
+            Assert.True(world.TryMoveUnit(SecondPlayerUnitId, 3, 2));
         }
     }
 }

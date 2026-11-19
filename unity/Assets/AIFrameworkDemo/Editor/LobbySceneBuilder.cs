@@ -140,6 +140,7 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "TowerDefenseButton", "进入塔防场景", "TowerDefenseScene");
             CreateSceneEntry(root, "IdleButton", "进入放置场景", "IdleScene");
             CreateSceneEntry(root, "GachaButton", "进入抽卡场景", "GachaScene");
+            CreateSceneEntry(root, "PuzzleButton", "进入解谜场景", "PuzzleScene");
 
             // 控制器与四个皮肤
             var lobbyGo = new GameObject("Lobby");

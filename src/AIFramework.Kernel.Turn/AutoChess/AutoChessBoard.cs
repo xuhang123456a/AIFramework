@@ -22,8 +22,12 @@ namespace AIFramework.Kernel.Turn.AutoChess
     /// <para>
     /// <b>零分配</b>：单位数组与占位表都在构造期一次分配；放置/挪位/出售/伤害/走位路径不申请托管堆内存。
     /// </para>
+    /// <para>
+    /// <b>文件拆分</b>：本文件只放内核状态与查询/战斗原语；备战席与棋盘的增删挪移在
+    /// <c>AutoChessBoard.Placement.cs</c>（同一 <c>partial</c> 类的另一半，按"读"与"写"分文件以守住 400 行预算）。
+    /// </para>
     /// </summary>
-    internal sealed class AutoChessBoard
+    internal sealed partial class AutoChessBoard
     {
         /// <summary>单位槽位数组（下标即对外 index；出售时后续元素前移，阵亡时保留）。</summary>
         private readonly AutoChessUnit[] _units;
@@ -176,94 +180,6 @@ namespace AIFramework.Kernel.Turn.AutoChess
         }
 
         /// <summary>
-        /// 把备战席单位放到己方半场第一个空格（扫描顺序 <c>y</c> 0→3、每行 <c>x</c> 0→7）。
-        /// 槽位不存在 / 非玩家 / 已在场 / 已阵亡 / 无空格返回 false，且不改任何状态。
-        /// </summary>
-        internal bool TryPlace(int unitId)
-        {
-            int slot = FindSlot(unitId);
-            if (slot < 0)
-            {
-                return false;
-            }
-
-            AutoChessUnit unit = _units[slot];
-            if (unit.Owner != AutoChessRules.PlayerOwner || unit.State != AutoChessUnitState.Bench || !unit.IsAlive)
-            {
-                return false;
-            }
-
-            if (!TryFindFreeCell(0, AutoChessRules.PlayerRowCount - 1, out int x, out int y))
-            {
-                return false;
-            }
-
-            _units[slot].State = AutoChessUnitState.Board;
-            _units[slot].X = x;
-            _units[slot].Y = y;
-            _occupancy[(y * Width) + x] = slot;
-            return true;
-        }
-
-        /// <summary>
-        /// 把己方在场单位挪到 (x, y)：要求目标格在己方半场且为空。
-        /// 槽位不存在 / 非玩家 / 未上场 / 已阵亡 / 越界 / 跨半场 / 被占返回 false。
-        /// </summary>
-        internal bool TryMoveUnit(int unitId, int x, int y)
-        {
-            int slot = FindSlot(unitId);
-            if (slot < 0)
-            {
-                return false;
-            }
-
-            AutoChessUnit unit = _units[slot];
-            if (unit.Owner != AutoChessRules.PlayerOwner || !unit.IsOnBoard)
-            {
-                return false;
-            }
-
-            if (!InBounds(x, y) || !IsPlayerHalf(y))
-            {
-                return false;
-            }
-
-            int target = (y * Width) + x;
-            if (_occupancy[target] >= 0)
-            {
-                return false;
-            }
-
-            _occupancy[(unit.Y * Width) + unit.X] = -1;
-            _units[slot].X = x;
-            _units[slot].Y = y;
-            _occupancy[target] = slot;
-            return true;
-        }
-
-        /// <summary>
-        /// 出售己方单位：释放占位并压缩槽位（后续 index 前移）。
-        /// 槽位不存在 / 非玩家 / 已阵亡返回 false（尸体由 <see cref="ResetForNextRound"/> 统一清场）。
-        /// </summary>
-        internal bool TrySell(int unitId)
-        {
-            int slot = FindSlot(unitId);
-            if (slot < 0)
-            {
-                return false;
-            }
-
-            AutoChessUnit unit = _units[slot];
-            if (unit.Owner != AutoChessRules.PlayerOwner || !unit.IsAlive)
-            {
-                return false;
-            }
-
-            RemoveAt(slot);
-            return true;
-        }
-
-        /// <summary>
         /// 找离第 <paramref name="slot"/> 个槽位曼哈顿最近的敌对"在场存活"单位；
         /// 同距离取槽位更小者（确定性），场上没有敌人返回 <c>-1</c>。
         /// </summary>
@@ -340,79 +256,7 @@ namespace AIFramework.Kernel.Turn.AutoChess
             return true;
         }
 
-        /// <summary>
-        /// 回合重置：清出阵亡单位与全部敌方单位（末三位槽位），存活玩家单位治疗满血、收回备战席，
-        /// 再重新生成 3 个敌方单位。下一轮的布阵从"全空 + 满血"开始。
-        /// </summary>
-        internal void ResetForNextRound()
-        {
-            for (int i = _slotCount - 1; i >= 0; i--)
-            {
-                if (_units[i].Owner == AutoChessRules.EnemyOwner || !_units[i].IsAlive)
-                {
-                    RemoveAt(i);
-                }
-            }
-
-            for (int i = 0; i < _slotCount; i++)
-            {
-                _units[i].State = AutoChessUnitState.Bench;
-                _units[i].X = AutoChessRules.BenchCoordinate;
-                _units[i].Y = AutoChessRules.BenchCoordinate;
-                _units[i].Hp = _units[i].MaxHp;
-            }
-
-            RebuildOccupancy();
-            SpawnEnemies();
-        }
-
-        /// <summary>追加 3 个敌方单位到敌方半场的头三个空格（<c>y = 4</c> 起、每行 <c>x</c> 递增）。</summary>
-        private void SpawnEnemies()
-        {
-            for (int j = 0; j < AutoChessRules.EnemyUnitCount; j++)
-            {
-                if (!TryFindFreeCell(AutoChessRules.EnemyRowStart, AutoChessRules.BoardHeight - 1, out int x, out int y))
-                {
-                    // 3 个单位对 32 格，理论上不可达；真到了这一步就少生成而不是越界。
-                    return;
-                }
-
-                int slot = AddUnit(
-                    AutoChessRules.EnemyUnitIdBase + j,
-                    AutoChessRules.EnemyOwner,
-                    AutoChessUnitState.Board,
-                    x,
-                    y,
-                    AutoChessRules.EnemyUnitHp,
-                    AutoChessRules.EnemyUnitAttack,
-                    AutoChessRules.EnemyUnitRange);
-
-                _occupancy[(y * Width) + x] = slot;
-            }
-        }
-
-        /// <summary>在 [<paramref name="startRow"/>, <paramref name="endRow"/>] 内找头一个空格。</summary>
-        private bool TryFindFreeCell(int startRow, int endRow, out int x, out int y)
-        {
-            for (int row = startRow; row <= endRow; row++)
-            {
-                for (int column = 0; column < Width; column++)
-                {
-                    if (_occupancy[(row * Width) + column] < 0)
-                    {
-                        x = column;
-                        y = row;
-                        return true;
-                    }
-                }
-            }
-
-            x = -1;
-            y = -1;
-            return false;
-        }
-
-        /// <summary>追加一个槽位并返回其 index；容量已满时返回 <c>-1</c>（不抛异常）。</summary>
+        /// <summary>移除第 slotCount 个槽位：后续元素整体前移，随后重建占位表。</summary>
         private int AddUnit(
             int unitId,
             int owner,

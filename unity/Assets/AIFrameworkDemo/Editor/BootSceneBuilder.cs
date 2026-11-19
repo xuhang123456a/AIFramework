@@ -93,6 +93,7 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, ArenaScenePath);
             AddIfSceneExists(scenes, IdleScenePath);
             AddIfSceneExists(scenes, GachaScenePath);
+            AddIfSceneExists(scenes, PuzzleScenePath);
             AddIfSceneExists(scenes, DemoScenePath);
 
             if (scenes.Count == 0)
@@ -154,6 +155,9 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>抽卡场景路径。</summary>
         private const string GachaScenePath = "Assets/AIFrameworkDemo/Scenes/GachaScene.unity";
+
+        /// <summary>解谜（推箱子）场景路径。</summary>
+        private const string PuzzleScenePath = "Assets/AIFrameworkDemo/Scenes/PuzzleScene.unity";
 
         /// <summary>Realtime 最小演示场景路径。</summary>
         private const string DemoScenePath = "Assets/AIFrameworkDemo/Scenes/DemoScene.unity";

@@ -76,7 +76,7 @@ namespace AIFramework.Contracts.Gameplay.Turn
         /// <remarks>越界（含负数）返回 <c>-1</c>，调用方不必先判界。</remarks>
         int CellAt(int x, int y);
 
-        /// <summary>是否已判负（新方块出生即碰撞，或结算已取回）。</summary>
+        /// <summary>是否已判负（新方块出生即碰撞）。结算是否已取回由 <c>IGameplaySession.IsFinished</c> 表达。</summary>
         bool IsGameOver { get; }
     }
 

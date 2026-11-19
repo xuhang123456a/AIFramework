@@ -14,7 +14,16 @@ namespace AIFramework.Contracts.Gameplay
         CardBattle = 2,
 
         /// <summary>三消棋盘：Kernel.Turn 的第三套内容，验证网格与级联同属回合流。</summary>
-        Match3 = 3
+        Match3 = 3,
+
+        /// <summary>解谜（推箱子）：Kernel.Turn 的第四套内容；装配层据此把会话派给 <c>PuzzleWorld</c>。</summary>
+        Puzzle = 4,
+
+        /// <summary>俄罗斯方块：Kernel.Turn 的第五套内容。</summary>
+        Tetris = 5,
+
+        /// <summary>自走棋：Kernel.Turn 的第六套内容。</summary>
+        AutoChess = 6
     }
 
     /// <summary>

@@ -486,7 +486,7 @@ namespace AIFramework.Core.Tests.Kernel
 
             GameplayResult result = world.CollectResult();
 
-            Assert.Equal(GameplayKernelType.Turn, result.KernelType);
+            Assert.Equal(GameplayKernelType.Puzzle, result.KernelType);
             Assert.True(result.IsVictory);
             Assert.Equal(3, result.StepCount);
             Assert.Equal(Level2SolutionMoves, result.RemainingUnits);

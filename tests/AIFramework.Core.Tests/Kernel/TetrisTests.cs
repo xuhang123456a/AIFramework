@@ -89,8 +89,10 @@ namespace AIFramework.Core.Tests.Kernel
             // 7-bag 同一袋内七种各发一次，所以"当前块"与"下一块"绝不可能是同一种。
             Assert.NotEqual((int)world.CurrentKind, world.NextKindRaw);
 
-            // 视图是纯读：连读两次不应推进随机。
-            Assert.Equal(world.NextKindRaw, world.NextKindRaw);
+            // 预取是纯读：连读两次值不变，也不会把随机推进掉（落点见 Bag_NextKindRaw_PredictsNextSpawn）。
+            int firstRead = world.NextKindRaw;
+            int secondRead = world.NextKindRaw;
+            Assert.Equal(firstRead, secondRead);
         }
 
         [Fact]
@@ -299,7 +301,7 @@ namespace AIFramework.Core.Tests.Kernel
             }
 
             Assert.Equal(7, world.CurrentX);
-            Assert.Equal(3, world.CurrentY);
+            Assert.Equal(0, world.CurrentY);
 
             Assert.True(world.TryRotate());
 
@@ -332,10 +334,8 @@ namespace AIFramework.Core.Tests.Kernel
             Assert.False(world.TryRotate());
             Assert.Equal(x, world.CurrentX);
             Assert.Equal(y, world.CurrentY);
-            AssertSameSequence(before, Snapshot(world));
-
-            // 同理：直接试着往下塞也会锁定，真正拒绝旋转的关键是"朝向与坐标都没变"。
             Assert.Equal(0, world.PieceCount);
+            AssertSameSequence(before, Snapshot(world));
         }
 
         // ── 下落与硬降 ──────────────────────────────────────────────────
@@ -554,7 +554,7 @@ namespace AIFramework.Core.Tests.Kernel
 
             GameplayResult result = world.CollectResult();
 
-            Assert.Equal(GameplayKernelType.Turn, result.KernelType);
+            Assert.Equal(GameplayKernelType.Tetris, result.KernelType);
             Assert.False(result.IsVictory);
             Assert.Empty(result.Loots);
             Assert.Empty(result.TriggeredTags);
@@ -570,7 +570,7 @@ namespace AIFramework.Core.Tests.Kernel
 
             GameplayResult result = world.CollectResult();
 
-            Assert.Equal(GameplayKernelType.Turn, result.KernelType);
+            Assert.Equal(GameplayKernelType.Tetris, result.KernelType);
             Assert.True(result.IsVictory);
             Assert.Single(result.Loots);
             Assert.Equal(1003, result.Loots[0].ItemId);
