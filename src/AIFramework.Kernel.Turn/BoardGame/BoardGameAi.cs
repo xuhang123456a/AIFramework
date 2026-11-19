@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using AIFramework.Contracts.Gameplay.Turn;
 
 namespace AIFramework.Kernel.Turn.BoardGame
 {
