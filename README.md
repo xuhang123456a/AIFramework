@@ -17,7 +17,7 @@
 ## 二、一分钟上手
 
 ```powershell
-# 1) 五层验证（build → test → viewgen → 形状校验），约 16 秒
+# 1) 六层验证（build → test → viewgen → tablegen --check → 形状校验），约 25 秒
 pwsh tools/verify-all.ps1
 
 # 2) 全量验证（追加真 Unity：场景生成 + 装配校验 + EditMode + PlayMode），约 6~8 分钟
@@ -49,7 +49,7 @@ src/
   Adapters/Unity/             引擎端口实现 + 场景绑定 + 视图 Binder
 unity/                        Unity 工程（17 场景 + 4 个 Editor 流水线脚本）
 tests/                        纯逻辑测试（1033 例）+ ArchTests 架构守卫 + Unity EditMode/PlayMode
-tools/                        verify-all / new-slice / viewgen / fixtures
+tools/                        verify-all / new-slice / viewgen / tablegen / fixtures(legacy)
 Doc/                          架构总纲 / 切片规范与验证流 / 玩法卡带索引 / HybridCLR 方案 / 路线图
 ```
 
@@ -63,6 +63,7 @@ Doc/                          架构总纲 / 切片规范与验证流 / 玩法�
 | 一切跨系统通信走 CQE | 命令 / 查询 / 事件；切片之间零引用，适配层只做装配 |
 | 视图契约由生成器产出 | `*.bindings.json` → `I<Panel>View.g.cs` + `<Panel>ViewBinder.g.cs`，禁止手写 |
 | 场景全部脚本生成 | 场景 YAML 不进人工编辑，`generate-scenes.ps1` 离屏生成 + `SceneVerifier` 反射校验注入 |
+| 配置表也走生成器 | `tables/*.json` → `tools/tablegen` → `.bin`（12 张表与手写夹具逐字节一致，`--check` 拦漂移） |
 
 ## 五、文档索引
 

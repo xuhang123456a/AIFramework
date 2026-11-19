@@ -8,8 +8,9 @@
       1. 语言层        dotnet build AIFramework.Pure.sln   （0 警告 0 错误）
       2. 纯逻辑测试    dotnet test  AIFramework.Pure.sln   （全部用例）
       3. 生成物一致性  dotnet run --project tools/viewgen -- --all
-      4. 适配层形状    pwsh unity/tools/check-adapter-compile.ps1
-      5. 真 Unity      场景生成 + 装配校验 / EditMode / PlayMode（需 -Unity 开关）
+      4. 配置表一致性  dotnet run --project tools/tablegen -- --check
+      5. 适配层形状    pwsh unity/tools/check-adapter-compile.ps1
+      6. 真 Unity      场景生成 + 装配校验 / EditMode / PlayMode（需 -Unity 开关）
 
     第 5 层跑在临时副本工程里（robocopy /MIR + 保留 Library），不影响正在使用的编辑器。
     用户开着 Unity 编辑器时也能跑，但**单机同一时间只应有一个 Unity batchmode**。
@@ -54,19 +55,23 @@ function Invoke-Gate {
     $results.Add("OK   " + $Name)
 }
 
-Invoke-Gate -Name '1/5 语言层：dotnet build' -Action {
+Invoke-Gate -Name '1/6 语言层：dotnet build' -Action {
     dotnet build AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '2/5 纯逻辑测试：dotnet test' -Action {
+Invoke-Gate -Name '2/6 纯逻辑测试：dotnet test' -Action {
     dotnet test AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '3/5 生成物一致性：viewgen --all' -Action {
+Invoke-Gate -Name '3/6 生成物一致性：viewgen --all' -Action {
     dotnet run --project tools/viewgen/ViewGen.csproj -- --all
 }
 
-Invoke-Gate -Name '4/5 适配层形状：check-adapter-compile' -Action {
+Invoke-Gate -Name '4/6 配置表一致性：tablegen --check' -Action {
+    dotnet run --project tools/tablegen/TableGen.csproj -- --check
+}
+
+Invoke-Gate -Name '5/6 适配层形状：check-adapter-compile' -Action {
     pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 }
 
@@ -75,16 +80,16 @@ if ($Unity) {
         throw ("找不到 Unity 可执行文件：{0}（用 -UnityPath 指定）" -f $UnityPath)
     }
 
-    Invoke-Gate -Name '5/5a 真 Unity：场景生成 + 装配校验' -Action {
+    Invoke-Gate -Name '6/6a 真 Unity：场景生成 + 装配校验' -Action {
         pwsh -NoProfile -File unity/tools/generate-scenes.ps1 -UnityPath $UnityPath
     }
 
     if (-not $SkipUnityTests) {
-        Invoke-Gate -Name '5/5b 真 Unity：EditMode 测试' -Action {
+        Invoke-Gate -Name '6/6b 真 Unity：EditMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform EditMode
         }
 
-        Invoke-Gate -Name '5/5c 真 Unity：PlayMode 测试' -Action {
+        Invoke-Gate -Name '6/6c 真 Unity：PlayMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform PlayMode
         }
     }
