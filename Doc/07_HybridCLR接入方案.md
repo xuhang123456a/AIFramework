@@ -101,3 +101,51 @@
    - 确定性回放（`StateFingerprint`）已可用于"热更前后一致性"验收
 
 **下一步（下一轮）**：按第二节 1~4 步在真 Unity 里装包 → 加 `HostFactory` → 跑第三节验证清单 → 把结果写回本文。
+
+---
+
+## 六、本机实测结果（2026-11-20，方案已从"纸面"升为"可复跑的安装态"）
+
+### 版本与前置
+| 项 | 实测值 |
+|---|---|
+| Unity | `6000.3.21f1`（IL2CPP 模块已安装，`Editor/Data/il2cpp` 存在） |
+| HybridCLR 包 | `com.code-philosophy.hybridclr@v9.1.0`（git URL，标签 `v9.1.0`） |
+| 安装器 API | `HybridCLR.Installer.InstallerController`（`InstallDefaultHybridCLR` / `HasInstalledHybridCLR`） |
+| 安装位置 | **工程内** `Library/HybridCLR/`：`hybridclr_repo` + `il2cpp_plus_repo` + `LocalIl2CppData-WindowsEditor` |
+| 自检结果 | `installed=True`、`InstalledLibil2cppVersion=9.1.0`、`HybridclrLocalVersion=v6000.3.x-9.1.0`、`localCache=True` |
+
+**关键结论（与网上多数旧教程不同）**：v9 起是**工程级 local il2cpp**，不改写 Unity 安装目录。
+因此安装/卸载都是工程内可逆操作，不会污染同版本的其它项目——这是本轮敢在真机工程里直接装的原因。
+
+### 一键入口（已进仓库）
+- 菜单：`AIFramework/HybridCLR/安装并自检`、`AIFramework/HybridCLR/只做自检（不安装）`
+- 批处理：`Unity -batchmode -quit -executeMethod AIFramework.Demo.Editor.HybridClrBootstrap.InstallAndVerify`
+- 实现要点：`HybridClrBootstrap.cs` 用**反射**按类型名探测，包没解析时打印明确错误而不是把主工程编崩
+  （若直接 `using HybridCLR.Editor`，未装包时整个工程不可编译，等于热更框架绑架主工程）。
+
+实测日志（副本工程，仓库同一份 manifest 与脚本）：
+```
+[HybridCLR] unity=6000.3.21f1 package=com.code-philosophy.hybridclr@v9.1.0
+[HybridCLR] PackageVersion=9.1.0
+[HybridCLR] HybridclrLocalVersion=v6000.3.x-9.1.0
+[HybridCLR] InstalledLibil2cppVersion=9.1.0
+[HybridCLR] InstallDefaultHybridCLR 调用完成（幂等，已安装时会跳过）
+[HybridCLR] installed=True installedLibil2cpp=9.1.0 localCache=True path=.../Library/HybridCLR
+[HybridCLR] 自检通过：安装态就绪
+```
+
+### 装了包之后主工程仍然全绿（回归证据）
+- 23 场景重新生成 + `SceneVerifier` 装配校验通过
+- EditMode 11/11、PlayMode 33/33
+- 纯逻辑 1196 例全绿（包只影响 Unity 侧，纯逻辑程序集零改动）
+
+### 仍未做的部分（下一阶段，需要真机出包窗口）
+1. 热更程序集切分：把"可热更业务"落成 `Assets/HotUpdate/` 下的 asmdef 并加入
+   `HybridCLRSettings.hotUpdateAssemblies`（当前业务代码在本地包 `src/AIFramework.Features`，
+   要热更需下沉一层壳程序集）。
+2. 生成 `link.xml` / AOT 元数据（`HybridCLR/Generate/All`），并产出 `AOTGenericReferences`。
+3. IL2CPP 出包 + 首次启动加载 `StreamingAssets/HotUpdate/*.dll.bytes` 的启动链路与回滚开关。
+4. 真机（Windows/Android）验证：热更 dll 版本替换、AOT 泛型缺失报错、回滚到内置版本。
+
+以上 4 项都依赖"完整 IL2CPP 出包 + 真机跑起来"，属于本仓当前唯一还停在 `[~]` 的条目（T3-8）。

@@ -298,6 +298,9 @@ namespace UnityEngine
 
         /// <summary>Assets 目录的绝对路径（桩：空串；真实 Unity 里是 &lt;project&gt;/Assets）。</summary>
         public static string dataPath = string.Empty;
+
+        /// <summary>引擎版本号（形状桩：真实 Unity 在 Application 上，HybridCLR 安装器要读它）。</summary>
+        public static string unityVersion = "6000.0.0f1";
     }
 
     public enum QueryTriggerInteraction
