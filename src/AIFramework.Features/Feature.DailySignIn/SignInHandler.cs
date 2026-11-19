@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Meta;

@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Numerics;
 using System;
 

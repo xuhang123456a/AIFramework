@@ -86,6 +86,12 @@ if (-not (Test-Path $workProject)) {
 
 Sync-Sources
 
+# 清理上次异常退出残留的工程锁：Unity 崩溃时不会删 Temp/UnityLockfile，
+# 下一次 batchmode 会误报"另一个实例已打开该工程"。
+$staleLock = Join-Path $workProject 'Temp/UnityLockfile'
+if (Test-Path $staleLock) {
+    Remove-Item -LiteralPath $staleLock -Force -ErrorAction SilentlyContinue
+}
 Write-Host '在副本工程里离屏生成场景…'
 
 # Unity.exe 是"启动器"，会立刻返回、真正的编辑器进程在后台跑并把日志异步写出来。

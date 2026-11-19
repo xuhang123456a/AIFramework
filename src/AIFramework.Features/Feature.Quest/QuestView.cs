@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Features.Quest
 {
     /// <summary>单条任务展示数据：由 Presenter 一次算好，视图只读、不回写。</summary>

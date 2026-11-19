@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Ports;
 using AIFramework.Features.HeroC_Shield;

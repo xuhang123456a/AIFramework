@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Features.Shop
 {
     /// <summary>

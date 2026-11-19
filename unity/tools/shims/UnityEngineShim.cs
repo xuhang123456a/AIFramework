@@ -256,6 +256,11 @@ namespace UnityEngine
 
     public static class Physics
     {
+        /// <summary>把 Transform 变更同步进物理世界（形状桩）。</summary>
+        public static void SyncTransforms()
+        {
+        }
+
         public static int OverlapSphereNonAlloc(
             Vector3 position, float radius, Collider[] results, int layerMask, QueryTriggerInteraction queryTriggerInteraction)
         {
@@ -316,6 +321,7 @@ namespace UnityEngine
         }
     }
 }
+
 
 
 

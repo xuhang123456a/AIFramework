@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Gameplay;
 
 namespace AIFramework.Kernel.Realtime

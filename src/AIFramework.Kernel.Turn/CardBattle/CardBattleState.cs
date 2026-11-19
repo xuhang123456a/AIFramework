@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Kernel.Turn.CardBattle
 {
     /// <summary>

@@ -101,6 +101,7 @@ namespace AIFramework.Adapters.Unity
                 return;
             }
 
+            bool moved = false;
             for (int i = _bindings.Count - 1; i >= 0; i--)
             {
                 Binding binding = _bindings[i];
@@ -110,6 +111,7 @@ namespace AIFramework.Adapters.Unity
                     if (_projectiles.TryGetProjectile(binding.ProjectileHandle, out ProjectileReadView view))
                     {
                         binding.GameObject.transform.position = ToWorld(view.Position);
+                        moved = true;
                         continue;
                     }
                 }
@@ -118,11 +120,19 @@ namespace AIFramework.Adapters.Unity
                     if (_units.TryGetUnit(binding.UnitHandle, out UnitReadView view))
                     {
                         binding.GameObject.transform.position = ToWorld(view.Position);
+                        moved = true;
                         continue;
                     }
                 }
 
                 RemoveAt(i);
+            }
+
+            // 工程设置 m_AutoSyncTransforms = 0：写 Transform 不会自动进 PhysX，
+            // 必须显式同步，否则同帧的重叠查询读到的还是上一帧（甚至出生点）的位姿。
+            if (moved)
+            {
+                Physics.SyncTransforms();
             }
         }
 

@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Ports;
 using System;
 using System.Collections.Generic;

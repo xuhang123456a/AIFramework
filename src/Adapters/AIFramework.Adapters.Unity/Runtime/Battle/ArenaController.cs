@@ -32,12 +32,22 @@ namespace AIFramework.Adapters.Unity.Battle
     /// 内核先收场（首杀即结束）→ 本波按清空推进。
     /// </para>
     /// <para>
-    /// <b>真机注意（已知缺口，未在本场修复）</b>：本场景是纯数据布场，场上没有 Unity 碰撞体；
-    /// 而装配层的 <c>UnitySpatialQuery</c> 走 <c>Physics.OverlapSphereNonAlloc</c>，
-    /// 只有被 <c>RegisterCollider</c> 登记过的碰撞体才认得出单位和飞行物。
-    /// 因此编辑器里通常表现为"飞行物穿过彼此、既不反射也不掉血"，最终靠 1200 帧兜底收场。
-    /// 要让反射/击杀真的发生，需要像 <c>AIFrameworkBehaviour.BindUnit/BindProjectile</c> 那样
-    /// 给每个单位与飞行物建碰撞体并登记句柄（本任务的可写范围里没有这项，故留作后续）。
+    /// <b>场景表现与碰撞体</b>：只做数据布场的话，场上没有任何 Unity 碰撞体，而装配层的
+    /// <c>UnitySpatialQuery</c> 走 <c>Physics.OverlapSphereNonAlloc</c> + "碰撞体 → 句柄"映射，
+    /// 没登记过的物体一律查不到——真机表现就是"飞行物穿过去、既不反射也不掉血"。
+    /// 所以布场时每个单位/飞行物都经 <see cref="RealtimeSceneBinder"/> 变成<b>已登记碰撞体</b>的图元，
+    /// 每个逻辑步 <c>Step</c> 之后同步一次 Transform；换波前先 <c>Dispose</c> 旧绑定再重建
+    /// （新会话的句柄从 0 号槽位重新发放，旧映射留着会把新单位串成旧单位）。
+    /// 碰撞体尺寸直接取布场时给内核的半径（胶囊/球体缩放 = 半径 × 2），位置与内核一致地落在
+    /// X-Z 平面（y = 0）。
+    /// </para>
+    /// <para>
+    /// <b>物理帧时序（真机需知）</b>：工程设置里 <c>Physics.autoSyncTransforms</c> 是关的，
+    /// 本类在 <c>Update</c> 里写 Transform 之后，Unity 要到下一次物理模拟（<c>FixedUpdate</c>）才把位姿同步给 PhysX。
+    /// 影响有限：反射判定（Phase 3）读的是"上一次同步后"的位姿，本场景飞行物 8 单位/秒、每步只走 0.13，
+    /// 而护盾采样圈半径 1.5、飞行物要在圈里穿行约 22 步，滞后一两步不会漏反射。
+    /// 真正的风险在布场当帧——新建碰撞体可能还没同步到目标位姿，
+    /// 要彻底消除需要 <c>Physics.SyncTransforms()</c>（见交付报告的"未验证点"）。
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -85,6 +95,13 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>出膛点相对敌人中心的外扩距离，避免出生当帧就与自己扫掠相交。</summary>
         private const float EnemyMuzzleOffset = 0.2f;
 
+        /// <summary>
+        /// 飞行物的判定半径（世界单位），<b>必须与 <c>Kernel.Realtime</c> 的私有常量
+        /// <c>ProjectileRadius</c>（0.1f）保持一致</b>：内核用"单位半径 + 本半径"做精确命中判定，
+        /// 场景侧的球体碰撞体用同一个值缩放，两边一旦不一致，物理查询的命中圈就会与内核判定错位。
+        /// </summary>
+        private const float ProjectileRadius = 0.1f;
+
         /// <summary>第一波序号（<see cref="CurrentWave"/> 从这个值开始）。</summary>
         private const int FirstWave = 1;
 
@@ -114,6 +131,13 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>会话强转出来的飞行物只读视图；内核未实现该接口时为 <c>null</c>。</summary>
         private IProjectileWorldReadView? _projectiles;
+
+        /// <summary>
+        /// 本波的场景表现绑定器：把布场出来的单位/飞行物变成已登记碰撞体的场景对象。
+        /// <b>一场一换</b>——它构造期抓住本会话的两个只读视图，且 <c>Dispose</c> 是一次性的，
+        /// 换波必须丢弃重建。视图缺失（内核未实现）时为 <c>null</c>，此时退回纯数据布场。
+        /// </summary>
+        private RealtimeSceneBinder? _binder;
 
         /// <summary>本波主角句柄（超时兜底时要靠它定位主角）。</summary>
         private UnitHandle _protagonist;
@@ -205,6 +229,10 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>
         /// 每帧推进一个固定逻辑步，然后判定波次/胜负并刷新 HUD。
         /// <b>固定步长而不是 <c>Time.deltaTime</c></b>：内核按固定帧推进，胜负不该随帧率漂移。
+        /// <para>
+        /// <b>Step 之后必须 Sync</b>：内核这一帧改过位置（飞行物积分、位移仲裁），
+        /// 下一次 <c>Step</c> 里的空间查询才会读场景碰撞体，所以同步要落在两次 <c>Step</c> 之间。
+        /// </para>
         /// </summary>
         private void Update()
         {
@@ -216,6 +244,12 @@ namespace AIFramework.Adapters.Unity.Battle
 
             session.Step(EffectiveStepSeconds());
             _framesTotal++;
+
+            RealtimeSceneBinder? binder = _binder;
+            if (binder != null)
+            {
+                binder.Sync();
+            }
 
             Tick();
 
@@ -353,6 +387,11 @@ namespace AIFramework.Adapters.Unity.Battle
                 return;
             }
 
+            // 上一波的场景对象与碰撞体必须先撤：Dispose 会逐个 Unregister 并销毁 GameObject。
+            // 放在 Release 之前是刻意的——绑定器只依赖构造期抓住的旧视图，先撤干净再换会话，
+            // 就不会出现"旧碰撞体仍挂在 host.Spatial 上、新单位却复用了同一个槽位句柄"的串号。
+            DisposeBinder();
+
             // 上一波已经收场（或本波放弃）：先交还会话，否则 Begin 会抛"已有活跃会话"。
             if (host.Sessions.HasActiveSession)
             {
@@ -391,17 +430,21 @@ namespace AIFramework.Adapters.Unity.Battle
 
             if (_units == null || _projectiles == null)
             {
-                host.Log.Warn("[Arena] 会话未完整实现只读视图，HUD 无法显示战场状态（波次判定退化）。");
+                host.Log.Warn("[Arena] 会话未完整实现只读视图，场景里不会创建任何碰撞体（HUD 也无法显示战场状态）。");
             }
 
-            _protagonist = DeployWave(sandbox, wave);
+            // 布场前先把绑定器建好：AddUnit/AddProjectile 要在 SpawnUnit/SpawnProjectile 之后立刻调用，
+            // 句柄只有在刚生成时才能与内核里的那一份对上。
+            _binder = CreateBinder(host);
+            _protagonist = DeployWave(sandbox, wave, _binder);
 
             host.Log.Info("[Arena] 第 " + wave + "/" + Waves + " 波开战：主角 HP=" + ProtagonistHp
                 + "，敌人=" + EnemyCountForWave(wave) + "，已用帧=" + _framesTotal);
         }
 
         /// <summary>
-        /// 布场：主角先放，再按等角圆摆这一波的敌人，每个敌人朝主角发射一枚飞行物。
+        /// 布场：主角先放，再按等角圆摆这一波的敌人，每个敌人朝主角发射一枚飞行物；
+        /// 每生成一个就立刻交给 <see cref="RealtimeSceneBinder"/> 建碰撞体并登记句柄。
         /// <para>
         /// <b>布场顺序即语义</b>：内核约定"首个 <c>SpawnUnit</c> 的单位是主角"，胜负读的就是它，
         /// 所以主角必须先于敌人放入，否则"主角阵亡"会被读成"敌人阵亡"。
@@ -409,8 +452,9 @@ namespace AIFramework.Adapters.Unity.Battle
         /// </summary>
         /// <param name="sandbox">会话的布场端口。</param>
         /// <param name="wave">当前波次。</param>
+        /// <param name="binder">场景绑定器；视图缺失（内核未实现只读视图）时为 <c>null</c>，此时只做数据布场。</param>
         /// <returns>主角句柄；槽位耗尽时为无效句柄。</returns>
-        private UnitHandle DeployWave(IRealtimeSandbox sandbox, int wave)
+        private UnitHandle DeployWave(IRealtimeSandbox sandbox, int wave, RealtimeSceneBinder? binder)
         {
             GameplayTagMask shield = GameplayTagMask.Empty.Add(GameplayTags.UnitShieldActive);
             UnitHandle protagonist = sandbox.SpawnUnit(
@@ -420,6 +464,11 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 _host?.Log.Error("[Arena] 主角槽位耗尽，第 " + wave + " 波布场失败（本波不会有任何战斗）。");
                 return default;
+            }
+
+            if (binder != null)
+            {
+                binder.AddUnit(protagonist, Vec2.Zero, ProtagonistRadius, "Protagonist");
             }
 
             int enemies = EnemyCountForWave(wave);
@@ -435,6 +484,11 @@ namespace AIFramework.Adapters.Unity.Battle
                     continue;
                 }
 
+                if (binder != null)
+                {
+                    binder.AddUnit(enemy, position, EnemyRadius, "Enemy_" + wave + "_" + i);
+                }
+
                 // 主角在原点，瞄准方向就是指向圆心的方向。
                 Vec2 direction = (-position).Normalized;
                 if (direction.SqrLength <= 0f)
@@ -442,15 +496,52 @@ namespace AIFramework.Adapters.Unity.Battle
                     direction = new Vec2(0f, -1f);
                 }
 
-                sandbox.SpawnProjectile(
+                Vec2 muzzle = position + (direction * (EnemyRadius + EnemyMuzzleOffset));
+                ProjectileHandle projectile = sandbox.SpawnProjectile(
                     enemy,
-                    position + (direction * (EnemyRadius + EnemyMuzzleOffset)),
+                    muzzle,
                     direction * EnemyProjectileSpeed,
                     EnemyProjectileDamage,
                     GameplayTagMask.Empty);
+
+                if (binder != null && projectile.IsValid)
+                {
+                    binder.AddProjectile(projectile, muzzle, ProjectileRadius, "Projectile_" + wave + "_" + i);
+                }
             }
 
             return protagonist;
+        }
+
+        /// <summary>
+        /// 为当前会话重建场景绑定器（调用前必须先 <see cref="DisposeBinder"/>）。
+        /// <b>为什么必须每波重建</b>：绑定器在构造期抓住本会话的只读视图，换会话后旧视图全部失效；
+        /// 且它的 <c>Dispose</c> 会永久置位，不能复用。
+        /// </summary>
+        /// <param name="host">宿主（绑定器从这里取空间查询端口）。</param>
+        /// <returns>绑定器；会话没有同时实现两个只读视图时为 <c>null</c>。</returns>
+        private RealtimeSceneBinder? CreateBinder(AIFrameworkUnityHost host)
+        {
+            IUnitWorldReadView? units = _units;
+            IProjectileWorldReadView? projectiles = _projectiles;
+            if (units == null || projectiles == null)
+            {
+                return null;
+            }
+
+            // root 用控制器自身节点：生成物挂在 Arena 下面，Hierarchy 里一眼能看出这一波是谁的。
+            return new RealtimeSceneBinder(host, units, projectiles, transform);
+        }
+
+        /// <summary>撤掉当前绑定器：逐个注销碰撞体并销毁场景对象；可重复调用。</summary>
+        private void DisposeBinder()
+        {
+            RealtimeSceneBinder? binder = _binder;
+            _binder = null;
+            if (binder != null)
+            {
+                binder.Dispose();
+            }
         }
 
         /// <summary>
@@ -569,6 +660,10 @@ namespace AIFramework.Adapters.Unity.Battle
             _units = null;
             _projectiles = null;
             _finished = true;
+
+            // 先撤掉本场生成的对象与碰撞体登记，再释放宿主；两步都不能省，
+            // 否则重进场景时上一场的映射会一直挂在宿主级空间查询里。
+            DisposeBinder();
 
             AIFrameworkUnityHost? host = _host;
             _host = null;

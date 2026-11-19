@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Features.DailySignIn;
 using System;
 using System.Collections.Generic;

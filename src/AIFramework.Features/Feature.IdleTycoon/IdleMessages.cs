@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Cqe;
 
 namespace AIFramework.Features.IdleTycoon

@@ -88,6 +88,12 @@ if ($Filter) {
     $unityArgs += @('-testFilter', $Filter)
 }
 
+# 清理上次异常退出残留的工程锁：Unity 崩溃时不会删 Temp/UnityLockfile，
+# 下一次 batchmode 会误报"另一个实例已打开该工程"。
+$staleLock = Join-Path $workProject 'Temp/UnityLockfile'
+if (Test-Path $staleLock) {
+    Remove-Item -LiteralPath $staleLock -Force -ErrorAction SilentlyContinue
+}
 Write-Host "在副本工程里跑 $TestPlatform 测试…"
 & $UnityPath @unityArgs
 

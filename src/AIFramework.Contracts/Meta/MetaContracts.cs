@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Contracts.Meta
 {
     /// <summary>发放道具指令：由业务切片发出，由背包切片（或 Phase 1 的模拟实现）处理。</summary>

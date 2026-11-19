@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Features.Inventory
 {
     /// <summary>背包条目（只读快照，UI/断言用）。</summary>

@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Contracts.Cqe
 {
     /// <summary>因果日志单条记录：全部为数值字段，热路径零字符串、零装箱。</summary>

@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Numerics;
 using System;

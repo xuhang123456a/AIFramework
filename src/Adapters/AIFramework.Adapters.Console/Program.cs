@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Adapters.Console
 {
     internal static class Program

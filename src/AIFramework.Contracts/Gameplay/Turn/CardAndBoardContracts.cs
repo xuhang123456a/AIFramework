@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 
 namespace AIFramework.Contracts.Gameplay.Turn

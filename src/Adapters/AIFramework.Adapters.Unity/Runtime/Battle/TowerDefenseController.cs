@@ -25,6 +25,19 @@ namespace AIFramework.Adapters.Unity.Battle
     /// （见 <see cref="IRealtimeSandbox"/> 契约）。"建完塔再塞进正在跑的战局"会破坏零分配假设，
     /// 因此建成后 <c>Release</c> 旧会话、用新布局重开一局——玩家看到的是"下一波坦克按新阵型开打"。
     /// </para>
+    /// <para>
+    /// <b>场景表现与碰撞体</b>：塔、敌方单位、敌方飞行物全部经 <see cref="RealtimeSceneBinder"/>
+    /// 变成<b>已登记碰撞体</b>的场景图元（没有它们，<c>UnitySpatialQuery</c> 的
+    /// <c>Physics.OverlapSphereNonAlloc</c> 一个都查不到，飞行物会直接穿过塔）。每帧推进完逻辑步后
+    /// <c>Sync()</c> 一次 Transform；建造重开一局前先 <c>Dispose</c> 旧绑定，因为新会话的句柄会从
+    /// 0 号槽位重新发放，旧映射留着就会把新单位串成旧单位。
+    /// </para>
+    /// <para>
+    /// <b>为什么不调用 <c>host.Spatial.Clear()</c></b>：宿主级空间查询是<b>全局</b>的，
+    /// <c>Clear()</c> 会把同一宿主上其它系统登记的碰撞体一起抹掉。本场景只有本控制器登记碰撞体，
+    /// 而 <see cref="RealtimeSceneBinder.Dispose"/> 已经逐个 <c>Unregister</c>，映射不会残留，
+    /// 因此这里刻意不做全局清空。
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerDefenseController : MonoBehaviour
@@ -74,6 +87,13 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>飞行物出膛点相对敌方单位中心的偏移，避免出生当帧就与自己扫掠相交。</summary>
         private const float EnemyMuzzleOffset = 0.6f;
 
+        /// <summary>
+        /// 飞行物的判定半径（世界单位），<b>必须与 <c>Kernel.Realtime</c> 的私有常量
+        /// <c>ProjectileRadius</c>（0.1f）保持一致</b>：内核用"单位半径 + 本半径"做精确命中判定，
+        /// 场景侧的球体碰撞体用同一个值缩放，两边一旦不一致，物理查询的命中圈就会与内核判定错位。
+        /// </summary>
+        private const float ProjectileRadius = 0.1f;
+
         /// <summary>敌方出生点相对棋盘上边缘的外扩距离（"从上方入场"）。</summary>
         private const float EnemySpawnOffset = 1f;
 
@@ -106,6 +126,19 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>会话强转出来的布场端口；内核未实现该接口时为 <c>null</c>。</summary>
         private IRealtimeSandbox? _sandbox;
+
+        /// <summary>会话强转出来的单位只读视图；绑定器要用它逐帧同步塔与敌方单位的位置。</summary>
+        private IUnitWorldReadView? _units;
+
+        /// <summary>会话强转出来的飞行物只读视图；绑定器要用它逐帧同步飞行物的位置。</summary>
+        private IProjectileWorldReadView? _projectiles;
+
+        /// <summary>
+        /// 本局的场景表现绑定器：塔、敌方单位、敌方飞行物的碰撞体都由它创建与登记。
+        /// <b>一局一换</b>——构造期抓住本会话的两个只读视图，且 <c>Dispose</c> 是一次性的。
+        /// 视图缺失（内核未实现）时为 <c>null</c>，此时退回纯数据布场。
+        /// </summary>
+        private RealtimeSceneBinder? _binder;
 
         /// <summary>本局塔的世界坐标（布场时算一次，飞行物瞄准用）。</summary>
         private readonly List<Vec2> _towerPositions = new List<Vec2>();
@@ -199,6 +232,11 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>
         /// 按累加器推进逻辑步，每 <see cref="HudRefreshSeconds"/> 刷一次 HUD，结束即结算。
         /// <b>刻意不用协程</b>（宪法禁止业务逻辑挂协程）。
+        /// <para>
+        /// 本帧的步走完后调一次 <c>binder.Sync()</c>：内核下一次 <c>Step</c> 里的空间查询
+        /// （护盾类技能查飞行物、命中判定查单位）读的就是场景碰撞体的当前位姿，
+        /// 所以同步点必须落在"本帧所有步之后"。
+        /// </para>
         /// </summary>
         private void Update()
         {
@@ -237,6 +275,14 @@ namespace AIFramework.Adapters.Unity.Battle
                 _accumulator = interval;
             }
 
+            // 本帧的步全部走完后同步一次场景位姿：一帧里补救多步时没必要每步都写 Transform，
+            // 而内核下一帧的空间查询读的正是这里写下去的位置。
+            RealtimeSceneBinder? binder = _binder;
+            if (binder != null)
+            {
+                binder.Sync();
+            }
+
             _hudAccumulator += Time.deltaTime;
             if (_hudAccumulator >= HudRefreshSeconds)
             {
@@ -262,7 +308,12 @@ namespace AIFramework.Adapters.Unity.Battle
 
             _session = null;
             _sandbox = null;
+            _units = null;
+            _projectiles = null;
             _finished = true;
+
+            // 先撤掉本局生成的对象与碰撞体登记，再释放宿主。
+            DisposeBinder();
 
             AIFrameworkUnityHost? host = _host;
             _host = null;
@@ -338,6 +389,10 @@ namespace AIFramework.Adapters.Unity.Battle
                 return;
             }
 
+            // 换局前先撤掉上一局的场景对象与碰撞体。binder.Dispose 已经逐个 Unregister，
+            // 所以这里不调用 host.Spatial.Clear()——宿主级查询是全局的，全局清空会误伤同宿主的其它系统。
+            DisposeBinder();
+
             if (host.Sessions.HasActiveSession)
             {
                 host.Sessions.Release();
@@ -375,7 +430,11 @@ namespace AIFramework.Adapters.Unity.Battle
                 return;
             }
 
-            int placed = DeployField(_sandbox, layout);
+            _units = session as IUnitWorldReadView;
+            _projectiles = session as IProjectileWorldReadView;
+            _binder = CreateBinder(host);
+
+            int placed = DeployField(_sandbox, layout, _binder);
             host.Log.Info("[TowerDefense] 第 " + _wave + " 波开战：塔单位=" + placed
                 + " 敌单位=" + EnemyUnitCount + " 已建塔格=" + layout.TowerCount);
 
@@ -383,12 +442,16 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
-        /// 布场：塔按格坐标转世界坐标放入，3 个敌方单位从棋盘上方入场并各发射一枚飞行物。
+        /// 布场：塔按格坐标转世界坐标放入，3 个敌方单位从棋盘上方入场并各发射一枚飞行物；
+        /// 每生成一个就立刻交给 <see cref="RealtimeSceneBinder"/> 建碰撞体并登记句柄。
         /// <b>布场顺序即语义</b>：第一个 <c>SpawnUnit</c> 的单位是内核认定的"主角"，
         /// 因此塔必须先于敌人放入，胜负才会被读成"塔阵守住了"。
         /// </summary>
+        /// <param name="sandbox">会话的布场端口。</param>
+        /// <param name="layout">要布到场上的塔布局快照。</param>
+        /// <param name="binder">场景绑定器；视图缺失（内核未实现只读视图）时为 <c>null</c>，此时只做数据布场。</param>
         /// <returns>成功放入的塔单位数。</returns>
-        private int DeployField(IRealtimeSandbox sandbox, TowerLayoutSnapshot layout)
+        private int DeployField(IRealtimeSandbox sandbox, TowerLayoutSnapshot layout, RealtimeSceneBinder? binder)
         {
             _towerPositions.Clear();
 
@@ -409,6 +472,12 @@ namespace AIFramework.Adapters.Unity.Battle
                         return _towerPositions.Count;
                     }
 
+                    if (binder != null)
+                    {
+                        // 塔的胶囊与格中心对齐，尺寸取内核判定半径 TowerRadius。
+                        binder.AddUnit(handle, position, TowerRadius, "Tower_" + x + "_" + y);
+                    }
+
                     _towerPositions.Add(position);
                 }
             }
@@ -422,16 +491,60 @@ namespace AIFramework.Adapters.Unity.Battle
                     continue;
                 }
 
+                if (binder != null)
+                {
+                    binder.AddUnit(enemy, position, EnemyRadius, "Enemy_" + i);
+                }
+
                 Vec2 direction = AimDirection(position, i);
-                sandbox.SpawnProjectile(
+                Vec2 muzzle = position + (direction * EnemyMuzzleOffset);
+                ProjectileHandle projectile = sandbox.SpawnProjectile(
                     enemy,
-                    position + (direction * EnemyMuzzleOffset),
+                    muzzle,
                     direction * EnemyProjectileSpeed,
                     EnemyProjectileDamage,
                     GameplayTagMask.Empty);
+
+                if (binder != null && projectile.IsValid)
+                {
+                    binder.AddProjectile(projectile, muzzle, ProjectileRadius, "EnemyProjectile_" + i);
+                }
             }
 
             return _towerPositions.Count;
+        }
+
+        /// <summary>
+        /// 为当前会话重建场景绑定器（调用前必须先 <see cref="DisposeBinder"/>）。
+        /// <b>为什么必须每局重建</b>：绑定器在构造期抓住本会话的只读视图，换会话后旧视图全部失效；
+        /// 且它的 <c>Dispose</c> 会永久置位，不能复用。
+        /// </summary>
+        /// <param name="host">宿主（绑定器从这里取空间查询端口）。</param>
+        /// <returns>绑定器；会话没有同时实现两个只读视图时为 <c>null</c>。</returns>
+        private RealtimeSceneBinder? CreateBinder(AIFrameworkUnityHost host)
+        {
+            IUnitWorldReadView? units = _units;
+            IProjectileWorldReadView? projectiles = _projectiles;
+            if (units == null || projectiles == null)
+            {
+                // 内核没暴露只读视图：没有位置源就没法同步，宁可只做数据布场，也不建一堆停在原点的物体。
+                host.Log.Warn("[TowerDefense] 会话未完整实现只读视图，场景里不会创建任何碰撞体（飞行物会直接穿过塔）。");
+                return null;
+            }
+
+            // root 用控制器自身节点：生成物挂在 TowerDefense 下面，Hierarchy 里一眼能看出这是战场对象。
+            return new RealtimeSceneBinder(host, units, projectiles, transform);
+        }
+
+        /// <summary>撤掉当前绑定器：逐个注销碰撞体并销毁场景对象；可重复调用。</summary>
+        private void DisposeBinder()
+        {
+            RealtimeSceneBinder? binder = _binder;
+            _binder = null;
+            if (binder != null)
+            {
+                binder.Dispose();
+            }
         }
 
         /// <summary>
@@ -449,6 +562,8 @@ namespace AIFramework.Adapters.Unity.Battle
             _finished = true;
             _session = null;
             _sandbox = null;
+            _units = null;
+            _projectiles = null;
 
             GameplayResult result;
             try

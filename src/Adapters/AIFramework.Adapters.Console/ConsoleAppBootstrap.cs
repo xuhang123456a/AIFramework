@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Gameplay.Turn;

@@ -1,3 +1,4 @@
+#nullable enable
 namespace AIFramework.Kernel.Realtime
 {
     /// <summary>
