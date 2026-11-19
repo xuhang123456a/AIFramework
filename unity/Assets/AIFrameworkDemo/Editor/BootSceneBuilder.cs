@@ -102,6 +102,7 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, PlatformerScenePath);
             AddIfSceneExists(scenes, RoguelikeScenePath);
             AddIfSceneExists(scenes, BoardGameScenePath);
+            AddIfSceneExists(scenes, TacticsScenePath);
             AddIfSceneExists(scenes, TycoonScenePath);
             AddIfSceneExists(scenes, IdleRpgScenePath);
             AddIfSceneExists(scenes, DemoScenePath);
@@ -192,6 +193,9 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>棋类场景路径。</summary>
         private const string BoardGameScenePath = "Assets/AIFrameworkDemo/Scenes/BoardGameScene.unity";
+
+        /// <summary>战棋场景路径。</summary>
+        private const string TacticsScenePath = "Assets/AIFrameworkDemo/Scenes/TacticsScene.unity";
 
         /// <summary>模拟经营场景路径。</summary>
         private const string TycoonScenePath = "Assets/AIFrameworkDemo/Scenes/TycoonScene.unity";

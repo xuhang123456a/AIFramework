@@ -7,7 +7,7 @@ using UnityEngine.UI;
 namespace AIFramework.Adapters.Unity.Battle
 {
     /// <summary>
-    /// 竞技场的 uGUI 皮肤：一行状态文本 + 一个重开按钮。
+    /// 竞技场的 uGUI 皮肤：一行状态文本 + 重开按钮 + 回放按钮。
     /// <para>
     /// <b>为什么状态全部从只读视图现算</b>：皮肤不持有任何战斗状态，只把
     /// <see cref="IUnitWorldReadView"/> / <see cref="IProjectileWorldReadView"/> 里的当前值拼成一句话。
@@ -21,6 +21,10 @@ namespace AIFramework.Adapters.Unity.Battle
     /// <b>为什么只在文本变化时写 <c>Text.text</c></b>：每帧无脑赋值会让 uGUI 每帧重建一次网格，
     /// 白白吃 CPU；状态行的内容只在数值变化时才需要变。
     /// </para>
+    /// <para>
+    /// <b>回放结果也走同一行文本</b>：回放是同步跑完的一次性动作，没有独立进度条可刷；
+    /// 皮肤只负责把"一致 / 首个不匹配帧"显示出来，是否允许回放由控制器判断。
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ArenaHud : MonoBehaviour
@@ -28,8 +32,14 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>重开按钮的固定文案（只用于提示语，不参与逻辑）。</summary>
         private const string RestartCaption = "重开";
 
+        /// <summary>回放按钮的固定文案（只用于提示语，不参与逻辑）。</summary>
+        private const string ReplayCaption = "回放上一局";
+
         /// <summary>玩家点了"重开"：能不能重开、重开后从第几波开始由控制器决定（皮肤不做规则判断）。</summary>
         public event Action? OnRestartClicked;
+
+        /// <summary>玩家点了"回放上一局"：回放什么、怎么比对由控制器决定（皮肤不做规则判断）。</summary>
+        public event Action? OnReplayClicked;
 
         /// <summary>状态行：波次 / 主角 HP / 存活敌人 / 反射次数 / 来袭飞行物。</summary>
         [SerializeField] private Text statusText = null!;
@@ -37,16 +47,25 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>重开按钮：只有一局收场后才可点（打一半重开会让结算报告对不上）。</summary>
         [SerializeField] private Button restartButton = null!;
 
+        /// <summary>回放按钮：只有一局收场后才可点（局中回放等于丢弃当前局）。</summary>
+        [SerializeField] private Button replayButton = null!;
+
         /// <summary>最近一次拼出的状态行（结算时在它后面追加胜负，而不是重新拼一遍）。</summary>
         private string _status = string.Empty;
 
-        /// <summary>挂上重开按钮回调并把它锁成不可点（未开局时没有可重开的东西）。</summary>
+        /// <summary>挂上重开/回放按钮回调，并把它们锁成不可点（未开局时没有可重开/回放的东西）。</summary>
         private void Awake()
         {
             if (restartButton != null)
             {
                 restartButton.onClick.AddListener(HandleRestartClicked);
                 restartButton.interactable = false;
+            }
+
+            if (replayButton != null)
+            {
+                replayButton.onClick.AddListener(HandleReplayClicked);
+                replayButton.interactable = false;
             }
         }
 
@@ -56,6 +75,11 @@ namespace AIFramework.Adapters.Unity.Battle
             if (restartButton != null)
             {
                 restartButton.onClick.RemoveListener(HandleRestartClicked);
+            }
+
+            if (replayButton != null)
+            {
+                replayButton.onClick.RemoveListener(HandleReplayClicked);
             }
         }
 
@@ -92,6 +116,11 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 restartButton.interactable = false;
             }
+
+            if (replayButton != null)
+            {
+                replayButton.interactable = false;
+            }
         }
 
         /// <summary>
@@ -109,12 +138,61 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 restartButton.interactable = true;
             }
+
+            if (replayButton != null)
+            {
+                replayButton.interactable = true;
+            }
+        }
+
+        /// <summary>
+        /// 显示一次回放的结果：是否逐帧一致、比对了多少帧、首个不匹配帧。
+        /// <b>文本只写一行</b>：回放是同步执行的一次性动作，没有可动画的中间态；
+        /// 结果行替换当前状态行，避免与"打到最后是什么状况"混在一起看不清。
+        /// </summary>
+        /// <param name="isMatch">是否完整且逐帧一致。</param>
+        /// <param name="comparedFrames">已比对帧数。</param>
+        /// <param name="firstMismatchFrame">首个不匹配帧；<c>-1</c> 表示没有可定位的帧内不匹配。</param>
+        public void ShowReplayResult(bool isMatch, int comparedFrames, int firstMismatchFrame)
+        {
+            string message;
+            if (isMatch)
+            {
+                message = ReplayCaption + "：一致 · 已比对 " + comparedFrames + " 帧";
+            }
+            else if (firstMismatchFrame >= 0)
+            {
+                message = ReplayCaption + "：不一致 · 已比对 " + comparedFrames
+                    + " 帧 · 首个不匹配帧 " + firstMismatchFrame;
+            }
+            else
+            {
+                message = ReplayCaption + "：不一致 · 已比对 " + comparedFrames
+                    + " 帧 · 录制帧数与回放对不上";
+            }
+
+            SetStatus(message);
+
+            if (replayButton != null)
+            {
+                replayButton.interactable = true;
+            }
         }
 
         /// <summary>把"点了重开"翻译成视图事件；重开语义由控制器决定。</summary>
         private void HandleRestartClicked()
         {
             Action? handler = OnRestartClicked;
+            if (handler != null)
+            {
+                handler();
+            }
+        }
+
+        /// <summary>把"点了回放"翻译成视图事件；回放与比对语义由控制器决定。</summary>
+        private void HandleReplayClicked()
+        {
+            Action? handler = OnReplayClicked;
             if (handler != null)
             {
                 handler();

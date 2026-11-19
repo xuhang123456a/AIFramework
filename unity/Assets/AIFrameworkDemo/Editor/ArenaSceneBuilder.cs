@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace AIFramework.Demo.Editor
 {
     /// <summary>
-    /// 一键生成实时竞技场场景（T1-5）：Camera + EventSystem + Canvas + 状态行 + 重开按钮
+    /// 一键生成实时竞技场场景（T1-5）：Camera + EventSystem + Canvas + 状态行 + 重开按钮 + 回放按钮
     /// + 挂控制器/皮肤的 <c>Arena</c> 物体。
     /// <para>
     /// <b>为什么不手写 <c>.unity</c> YAML</b>：手写要拼 fileID/GUID，错一个整场景打不开，AI 也无法可靠改；
@@ -19,7 +19,7 @@ namespace AIFramework.Demo.Editor
     /// <para>
     /// <b>场景里没有任何战场物体</b>：竞技场的单位与飞行物由控制器通过 <c>IRealtimeSandbox</c> 在
     /// 逻辑层布场，"看得见的战场"要么后续做可视化层，要么用 <c>AIFrameworkBehaviour.BindUnit</c>
-    /// 那套碰撞体登记把逻辑体映射到场景体。本场景只负责"能看状态、能重开"。
+    /// 那套碰撞体登记把逻辑体映射到场景体。本场景只负责"能看状态、能重开、能回放上一局"。
     /// </para>
     /// </summary>
     public static class ArenaSceneBuilder
@@ -72,7 +72,11 @@ namespace AIFramework.Demo.Editor
             Button restartButton = CreateButton("RestartButton", root, "重开一局");
             SetHeight(restartButton.gameObject, RowHeight);
 
-            // 控制器与皮肤挂同一个物体：控制器 Awake 里要拿到 hud 才能订阅重开事件。
+            // 回放按钮：只有结算后控制器才放开点击；SceneVerifier 会反射检查它必须被注入。
+            Button replayButton = CreateButton("ReplayButton", root, "回放上一局");
+            SetHeight(replayButton.gameObject, RowHeight);
+
+            // 控制器与皮肤挂同一个物体：控制器 Awake 里要拿到 hud 才能订阅重开/回放事件。
             var arenaGo = new GameObject("Arena");
             var controller = arenaGo.AddComponent<ArenaController>();
             var hud = arenaGo.AddComponent<ArenaHud>();
@@ -84,12 +88,13 @@ namespace AIFramework.Demo.Editor
 
             SetReference(hud, "statusText", status);
             SetReference(hud, "restartButton", restartButton);
+            SetReference(hud, "replayButton", replayButton);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
 
             Debug.Log("[AIFramework] 竞技场场景已生成：" + ScenePath
-                + "，按 Play 运行（3 波敌人，清空即胜利；主角阵亡或 1200 帧触顶则失败）。");
+                + "，按 Play 运行（3 波敌人，清空即胜利；主角阵亡或 1200 帧触顶则失败；结算后可回放上一局）。");
         }
 
         private static void CreateCamera()

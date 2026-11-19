@@ -5,6 +5,7 @@ using System.IO;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
+using AIFramework.Core.Replay;
 using UnityEngine;
 
 namespace AIFramework.Adapters.Unity.Battle
@@ -58,6 +59,9 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>竞技场总逻辑帧上限（三波共用），到顶即兜底判负，防"一局永远打不完"。</summary>
         private const int MaxTotalFrames = 1200;
+
+        /// <summary>回放帧数硬上限：与 <see cref="ArenaRecorder"/> 默认容量一致，保证一次回放在有限时间内结束。</summary>
+        private const int MaxReplayFrames = 2400;
 
         /// <summary>步进兜底值：字段被 Inspector 改成 0 或负数时用它，避免时间轴停摆。</summary>
         private const float FallbackStepSeconds = 1f / 60f;
@@ -142,6 +146,21 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>本波主角句柄（超时兜底时要靠它定位主角）。</summary>
         private UnitHandle _protagonist;
 
+        /// <summary>本局的回放脚本（种子 + 每波布场参数）；开局时生成，重开再生成。</summary>
+        private ArenaReplayScript? _script;
+
+        /// <summary>本局的录制器：每帧一个状态指纹；结算后保留，供"回放上一局"使用。</summary>
+        private ArenaRecorder? _recorder;
+
+        /// <summary>回放是否正在同步执行（期间禁止 <see cref="Update"/> 再推进真实战局）。</summary>
+        private bool _replaying;
+
+        /// <summary>最近一次回放是否逐帧一致（未回放或回放中断时为 <c>false</c>）。</summary>
+        private bool _lastReplayMatched;
+
+        /// <summary>最近一次回放已比对的帧数（未回放时为 0）。</summary>
+        private int _lastReplayFrames;
+
         /// <summary>当前波次；结束后归 <see cref="FirstWave"/> 之外的 0。</summary>
         private int _wave;
 
@@ -173,6 +192,18 @@ namespace AIFramework.Adapters.Unity.Battle
         public bool IsVictory
         {
             get { return _isVictory; }
+        }
+
+        /// <summary>最近一次"回放上一局"是否逐帧一致（未回放过或回放中断时为 <c>false</c>）。</summary>
+        public bool LastReplayMatched
+        {
+            get { return _lastReplayMatched; }
+        }
+
+        /// <summary>最近一次"回放上一局"已比对的帧数（未回放时为 0）。</summary>
+        public int LastReplayFrames
+        {
+            get { return _lastReplayFrames; }
         }
 
         /// <summary>
@@ -217,6 +248,7 @@ namespace AIFramework.Adapters.Unity.Battle
             if (view != null)
             {
                 view.OnRestartClicked += HandleRestartClicked;
+                view.OnReplayClicked += HandleReplayClicked;
             }
             else
             {
@@ -237,13 +269,15 @@ namespace AIFramework.Adapters.Unity.Battle
         private void Update()
         {
             IGameplaySession? session = _session;
-            if (session == null || _finished)
+            if (session == null || _finished || _replaying)
             {
                 return;
             }
 
             session.Step(EffectiveStepSeconds());
             _framesTotal++;
+
+            RecordFrame();
 
             RealtimeSceneBinder? binder = _binder;
             if (binder != null)
@@ -399,9 +433,10 @@ namespace AIFramework.Adapters.Unity.Battle
             }
 
             IGameplaySession session;
+            WaveSpec spec = WaveSpecFor(wave);
             try
             {
-                var init = new GameplayInitData(levelId, randomSeed + wave, EnemyCountForWave(wave) + 1);
+                var init = new GameplayInitData(levelId, randomSeed + wave, spec.EnemyCount + 1);
                 session = host.Sessions.Begin(GameplayKernelType.Realtime, in init);
             }
             catch (InvalidOperationException exception)
@@ -436,10 +471,10 @@ namespace AIFramework.Adapters.Unity.Battle
             // 布场前先把绑定器建好：AddUnit/AddProjectile 要在 SpawnUnit/SpawnProjectile 之后立刻调用，
             // 句柄只有在刚生成时才能与内核里的那一份对上。
             _binder = CreateBinder(host);
-            _protagonist = DeployWave(sandbox, wave, _binder);
+            _protagonist = DeployWave(sandbox, wave, _binder, in spec);
 
             host.Log.Info("[Arena] 第 " + wave + "/" + Waves + " 波开战：主角 HP=" + ProtagonistHp
-                + "，敌人=" + EnemyCountForWave(wave) + "，已用帧=" + _framesTotal);
+                + "，敌人=" + spec.EnemyCount + "，已用帧=" + _framesTotal);
         }
 
         /// <summary>
@@ -453,8 +488,13 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <param name="sandbox">会话的布场端口。</param>
         /// <param name="wave">当前波次。</param>
         /// <param name="binder">场景绑定器；视图缺失（内核未实现只读视图）时为 <c>null</c>，此时只做数据布场。</param>
+        /// <param name="spec">本波参数（数量与半径来自回放脚本，回放时才能逐位复现）。</param>
         /// <returns>主角句柄；槽位耗尽时为无效句柄。</returns>
-        private UnitHandle DeployWave(IRealtimeSandbox sandbox, int wave, RealtimeSceneBinder? binder)
+        private UnitHandle DeployWave(
+            IRealtimeSandbox sandbox,
+            int wave,
+            RealtimeSceneBinder? binder,
+            in WaveSpec spec)
         {
             GameplayTagMask shield = GameplayTagMask.Empty.Add(GameplayTags.UnitShieldActive);
             UnitHandle protagonist = sandbox.SpawnUnit(
@@ -471,12 +511,12 @@ namespace AIFramework.Adapters.Unity.Battle
                 binder.AddUnit(protagonist, Vec2.Zero, ProtagonistRadius, "Protagonist");
             }
 
-            int enemies = EnemyCountForWave(wave);
+            int enemies = spec.EnemyCount;
             for (int i = 0; i < enemies; i++)
             {
                 Vec2 position = EnemyPosition(i, enemies);
                 UnitHandle enemy = sandbox.SpawnUnit(
-                    position, EnemyRadius, EnemyArmorLevel, EnemyHp, GameplayTagMask.Empty);
+                    position, spec.Radius, EnemyArmorLevel, EnemyHp, GameplayTagMask.Empty);
 
                 if (!enemy.IsValid)
                 {
@@ -486,7 +526,7 @@ namespace AIFramework.Adapters.Unity.Battle
 
                 if (binder != null)
                 {
-                    binder.AddUnit(enemy, position, EnemyRadius, "Enemy_" + wave + "_" + i);
+                    binder.AddUnit(enemy, position, spec.Radius, "Enemy_" + wave + "_" + i);
                 }
 
                 // 主角在原点，瞄准方向就是指向圆心的方向。
@@ -496,7 +536,7 @@ namespace AIFramework.Adapters.Unity.Battle
                     direction = new Vec2(0f, -1f);
                 }
 
-                Vec2 muzzle = position + (direction * (EnemyRadius + EnemyMuzzleOffset));
+                Vec2 muzzle = position + (direction * (spec.Radius + EnemyMuzzleOffset));
                 ProjectileHandle projectile = sandbox.SpawnProjectile(
                     enemy,
                     muzzle,
@@ -643,7 +683,15 @@ namespace AIFramework.Adapters.Unity.Battle
                 + "，总帧=" + _framesTotal
                 + "，剩余单位=" + result.RemainingUnits
                 + "，反射=" + _reflectedTotal
-                + "，战利品条目=" + loots.Count);
+                + "，战利品条目=" + loots.Count
+                + "，录制帧=" + RecorderFrameCount());
+
+            ArenaRecorder? recorder = _recorder;
+            if (recorder != null && recorder.DroppedFrames)
+            {
+                // 容量写满只影响回放尾段，不影响本局结算；显式留痕，避免"回放莫名短一截"。
+                host.Log.Warn("[Arena] 录像帧容量耗尽，尾部帧已丢弃（回放只能比对已录部分）。");
+            }
         }
 
         /// <summary>退订 HUD 事件并释放宿主（<c>Dispose</c> 会丢弃未结算的会话引用）。</summary>
@@ -653,6 +701,7 @@ namespace AIFramework.Adapters.Unity.Battle
             if (view != null)
             {
                 view.OnRestartClicked -= HandleRestartClicked;
+                view.OnReplayClicked -= HandleReplayClicked;
             }
 
             _session = null;
@@ -684,6 +733,21 @@ namespace AIFramework.Adapters.Unity.Battle
             Restart();
         }
 
+        /// <summary>
+        /// 回放按钮：只有收场后且确实录到过帧才允许点。
+        /// 回放语义（重开一局、逐帧比对指纹）由控制器决定，HUD 不做规则判断。
+        /// </summary>
+        private void HandleReplayClicked()
+        {
+            ArenaRecorder? recorder = _recorder;
+            if (!_finished || recorder == null || recorder.FrameCount <= 0)
+            {
+                return;
+            }
+
+            ReplayLastRun();
+        }
+
         /// <summary>把竞技场复位到第一波（计数器、胜负标记、反射累计一起清）。</summary>
         private void Restart()
         {
@@ -699,6 +763,10 @@ namespace AIFramework.Adapters.Unity.Battle
             _framesTotal = 0;
             _reflectedTotal = 0;
             _protagonist = default;
+
+            // 每局一份脚本 + 一份录制器：重开不能复用上一局的录制，否则指纹会接在旧录像尾部。
+            _script = CreateScript(randomSeed);
+            _recorder = new ArenaRecorder(_script);
 
             StartWave(FirstWave);
             RenderHud();
@@ -716,8 +784,309 @@ namespace AIFramework.Adapters.Unity.Battle
             _reflectedTotal = 0;
             _protagonist = default;
 
+            // 每局一份脚本 + 一份录制器：脚本在构造期复制波次参数，录制器一次性预分配指纹数组。
+            _script = CreateScript(randomSeed);
+            _recorder = new ArenaRecorder(_script);
+
             StartWave(FirstWave);
             RenderHud();
+        }
+
+        /// <summary>
+        /// 回放上一局：用录制的脚本重开一局、逐帧重推并比对状态指纹。
+        /// <para>
+        /// <b>为什么同步跑完而不是分帧</b>：回放需要反复建/删碰撞体并重推内核；分帧会把"回放世界"
+        /// 与真实战局混进同一个 <see cref="Update"/>，状态机立刻变得不可推理。同步执行把整个回放
+        /// 限制在一次调用内（最多 <see cref="MaxReplayFrames"/> 帧），结束后再回到正常状态。
+        /// </para>
+        /// <para>
+        /// <b>局中调用</b>：若当前这一局还没结算，则只回放"已录到的前缀"，回放结束后自动重开一局；
+        /// 正常入口（HUD 回放按钮）只在结算后开放。
+        /// </para>
+        /// </summary>
+        /// <returns>回放是否完整且逐帧一致；没有可回放的录制时返回 <c>false</c>。</returns>
+        public bool ReplayLastRun()
+        {
+            AIFrameworkUnityHost? host = _host;
+            ArenaRecorder? recorder = _recorder;
+            if (host == null || recorder == null || recorder.FrameCount <= 0 || _replaying)
+            {
+                return false;
+            }
+
+            // 回放开始前记下"这一局是否已结算"：决定回放结束后是留在结算态还是重开一局。
+            bool wasFinished = _finished;
+            _replaying = true;
+
+            // 回放要独占会话宿主：先撤掉正在推进的这一局（会话引用由 finally 兜底释放）。
+            // 局中调用时这一局会被丢弃，但它本来就只用于"看回放"，不能同帧并行两个战局。
+            DisposeBinder();
+            if (host.Sessions.HasActiveSession)
+            {
+                host.Sessions.Release();
+            }
+
+            _session = null;
+            _sandbox = null;
+            _units = null;
+            _projectiles = null;
+            _wave = 0;
+            _finished = true;
+
+            ArenaReplayVerifier verifier = new ArenaReplayVerifier(recorder);
+            bool completed = false;
+            try
+            {
+                completed = RunReplay(host, recorder.Script, verifier, recorder.FrameCount);
+            }
+            catch (InvalidOperationException exception)
+            {
+                host.Log.Error("[Arena] 回放中断（会话不可用）：" + exception.Message);
+            }
+            finally
+            {
+                DisposeBinder();
+                if (host.Sessions.HasActiveSession)
+                {
+                    host.Sessions.Release();
+                }
+
+                _session = null;
+                _sandbox = null;
+                _units = null;
+                _projectiles = null;
+                _replaying = false;
+            }
+
+            _lastReplayFrames = verifier.ComparedFrames;
+            _lastReplayMatched = completed && verifier.IsComplete && verifier.IsMatch;
+
+            ArenaHud? view = hud;
+            if (view != null)
+            {
+                view.ShowReplayResult(_lastReplayMatched, verifier.ComparedFrames, verifier.FirstMismatchFrame);
+            }
+
+            host.Log.Info("[Arena] 回放" + (_lastReplayMatched ? "一致" : "不一致")
+                + "：比对帧=" + verifier.ComparedFrames
+                + "，录制帧=" + recorder.FrameCount
+                + "，首个不匹配=" + verifier.FirstMismatchFrame);
+
+            if (!wasFinished)
+            {
+                // 局中回放只是读取已录前缀；结束后重开一局，让竞技场回到正常推进状态。
+                StartArena();
+            }
+
+            return _lastReplayMatched;
+        }
+
+        /// <summary>
+        /// 回放主循环：按录制帧数逐帧推进，先推一帧、再比指纹、再同步场景、最后按与
+        /// <see cref="Tick"/> 完全相同的优先级决定是否换波。
+        /// <para>
+        /// <b>为什么要照抄 Tick 的换波判定</b>：录制只存指纹与"连续帧序列"，不存波次边界；
+        /// 回放必须靠同一套状态判定在<b>同一帧</b>换波，否则下一帧就会在新旧两个战场上比对。
+        /// 判定条件与顺序一旦与 <see cref="Tick"/> 不一致，回放会立刻在换波帧出现假不一致。
+        /// </para>
+        /// </summary>
+        /// <param name="host">宿主（会话与空间查询的唯一入口）。</param>
+        /// <param name="script">录制的布场脚本。</param>
+        /// <param name="verifier">逐帧比对器。</param>
+        /// <param name="recordedFrames">录制帧数（回放最多推进这么多帧）。</param>
+        /// <returns>是否完整比对完录制帧数。</returns>
+        private bool RunReplay(
+            AIFrameworkUnityHost host,
+            ArenaReplayScript script,
+            ArenaReplayVerifier verifier,
+            int recordedFrames)
+        {
+            if (script.WaveCount <= 0 || recordedFrames <= 0)
+            {
+                return false;
+            }
+
+            int replayLimit = recordedFrames < MaxReplayFrames ? recordedFrames : MaxReplayFrames;
+            int wave = FirstWave;
+            if (!BeginReplayWave(host, script, wave))
+            {
+                return false;
+            }
+
+            float stepSeconds = EffectiveStepSeconds();
+            int framesTotal = 0;
+
+            for (int frame = 0; frame < replayLimit; frame++)
+            {
+                IGameplaySession? session = _session;
+                IUnitWorldReadView? units = _units;
+                IProjectileWorldReadView? projectiles = _projectiles;
+                if (session == null || units == null || projectiles == null)
+                {
+                    return false;
+                }
+
+                session.Step(stepSeconds);
+                framesTotal++;
+
+                verifier.PushFrame(StateFingerprint.Of(units, projectiles));
+
+                RealtimeSceneBinder? binder = _binder;
+                if (binder != null)
+                {
+                    binder.Sync();
+                }
+
+                ReadField(out int protagonistHp, out int aliveEnemies);
+
+                // 与 Tick 同序：主角阵亡 → 敌人清空 → 内核先收场 → 总帧数触顶。
+                if (protagonistHp == 0)
+                {
+                    return frame + 1 == recordedFrames && verifier.IsComplete;
+                }
+
+                bool waveCleared = protagonistHp > 0 && aliveEnemies == 0;
+                if (!waveCleared && !session.IsFinished)
+                {
+                    if (framesTotal >= MaxTotalFrames)
+                    {
+                        // 原局在这一帧之后 ForceDefeat + Finish，录制到此为止。
+                        return frame + 1 == recordedFrames && verifier.IsComplete;
+                    }
+
+                    continue;
+                }
+
+                if (wave >= script.WaveCount)
+                {
+                    // 最后一波已清空（或内核收场）：原局此时结算，录制帧数必须正好到此为止。
+                    return frame + 1 == recordedFrames && verifier.IsComplete;
+                }
+
+                // 录制前缀正好停在换波这一帧：不需要再开下一波（开了也会立刻被释放）。
+                if (frame + 1 >= recordedFrames)
+                {
+                    return verifier.IsComplete;
+                }
+
+                DisposeBinder();
+                host.Sessions.Release();
+                _session = null;
+                _sandbox = null;
+                _units = null;
+                _projectiles = null;
+
+                wave++;
+                if (!BeginReplayWave(host, script, wave))
+                {
+                    return false;
+                }
+            }
+
+            return verifier.IsComplete;
+        }
+
+        /// <summary>
+        /// 为回放开一波：<c>Begin</c> → 取端口 → 建绑定器 → 按脚本布场。
+        /// <b>回放也必须建绑定器</b>：护盾反射阶段查的是装配层的空间查询（Physics 碰撞体），
+        /// 只做数据布场会让回放局在第 0 帧就与录制局分叉。
+        /// </summary>
+        /// <param name="host">宿主。</param>
+        /// <param name="script">布场脚本。</param>
+        /// <param name="wave">要开的波次（1..script.WaveCount）。</param>
+        /// <returns>是否成功开波并布场。</returns>
+        private bool BeginReplayWave(AIFrameworkUnityHost host, ArenaReplayScript script, int wave)
+        {
+            int index = wave - FirstWave;
+            if (index < 0 || index >= script.WaveCount)
+            {
+                return false;
+            }
+
+            WaveSpec spec = script.Waves[index];
+            IGameplaySession session;
+            try
+            {
+                var init = new GameplayInitData(levelId, script.RandomSeed + wave, spec.EnemyCount + 1);
+                session = host.Sessions.Begin(GameplayKernelType.Realtime, in init);
+            }
+            catch (InvalidOperationException exception)
+            {
+                host.Log.Error("[Arena] 回放第 " + wave + " 波开局失败：" + exception.Message);
+                return false;
+            }
+
+            IRealtimeSandbox? sandbox = session as IRealtimeSandbox;
+            IUnitWorldReadView? units = session as IUnitWorldReadView;
+            IProjectileWorldReadView? projectiles = session as IProjectileWorldReadView;
+            if (sandbox == null || units == null || projectiles == null)
+            {
+                host.Log.Error("[Arena] 回放所需端口缺失（IRealtimeSandbox / 只读视图），无法逐帧比对。");
+                host.Sessions.Release();
+                return false;
+            }
+
+            _session = session;
+            _sandbox = sandbox;
+            _units = units;
+            _projectiles = projectiles;
+            _binder = new RealtimeSceneBinder(host, units, projectiles, transform);
+            _protagonist = DeployWave(sandbox, wave, _binder, in spec);
+
+            return _protagonist.IsValid;
+        }
+
+        /// <summary>
+        /// 记录当前帧的状态指纹。<b>只读视图缺失时跳过</b>：没有视图就没有可比较的状态，
+        /// 与其记一个假指纹，不如让录制器保持 0 帧（回放入口会直接返回 <c>false</c>）。
+        /// </summary>
+        private void RecordFrame()
+        {
+            IUnitWorldReadView? units = _units;
+            IProjectileWorldReadView? projectiles = _projectiles;
+            ArenaRecorder? recorder = _recorder;
+            if (units == null || projectiles == null || recorder == null)
+            {
+                return;
+            }
+
+            recorder.RecordFrame(StateFingerprint.Of(units, projectiles));
+        }
+
+        /// <summary>本局录到的帧数（录制器未就绪时为 0）。</summary>
+        private int RecorderFrameCount()
+        {
+            ArenaRecorder? recorder = _recorder;
+            return recorder != null ? recorder.FrameCount : 0;
+        }
+
+        /// <summary>
+        /// 生成本局的回放脚本：种子 + 每波敌人数量/半径。
+        /// <b>位置不放进脚本</b>：它是 <c>(序号, 数量)</c> 的纯函数，同一份代码必然算出同一组坐标。
+        /// </summary>
+        private static ArenaReplayScript CreateScript(int seed)
+        {
+            WaveSpec[] waves = new WaveSpec[Waves];
+            for (int i = 0; i < Waves; i++)
+            {
+                int wave = FirstWave + i;
+                waves[i] = new WaveSpec(EnemyCountForWave(wave), EnemyRadius);
+            }
+
+            return new ArenaReplayScript(seed, Waves, waves);
+        }
+
+        /// <summary>取第 <paramref name="wave"/> 波的布场参数；脚本缺失时退回代码内常量。</summary>
+        private WaveSpec WaveSpecFor(int wave)
+        {
+            ArenaReplayScript? script = _script;
+            int index = wave - FirstWave;
+            if (script != null && index >= 0 && index < script.WaveCount)
+            {
+                return script.Waves[index];
+            }
+
+            return new WaveSpec(EnemyCountForWave(wave), EnemyRadius);
         }
 
         /// <summary>渲染一次 HUD（会话可能已被置空，故先取本地副本）。</summary>

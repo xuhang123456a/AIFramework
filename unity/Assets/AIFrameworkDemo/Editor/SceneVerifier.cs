@@ -64,6 +64,7 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/PlatformerScene.unity", typeof(PlatformerController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/RoguelikeScene.unity", typeof(RoguelikeController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/BoardGameScene.unity", typeof(BoardGameController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TacticsScene.unity", typeof(TacticsController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TycoonScene.unity", typeof(TycoonPanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity", typeof(IdleRpgPanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))

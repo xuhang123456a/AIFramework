@@ -137,6 +137,12 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator TacticsScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<TacticsController>("TacticsScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");
