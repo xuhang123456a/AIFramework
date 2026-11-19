@@ -26,15 +26,15 @@ namespace UnityEngine
         public GameObject gameObject = new GameObject();
 
         /// <summary>取自身或子节点上的组件（形状桩）。</summary>
-        public T? GetComponent<T>() where T : Component
+        public T GetComponent<T>() where T : Component
         {
-            return null;
+            return null!;
         }
 
         /// <summary>取子节点上的组件（形状桩）。</summary>
-        public T? GetComponentInChildren<T>() where T : Component
+        public T GetComponentInChildren<T>() where T : Component
         {
-            return null;
+            return null!;
         }
     }
 
@@ -66,22 +66,28 @@ namespace UnityEngine
 
         public void SetActive(bool value) { activeSelf = value; }
 
-        /// <summary>取自身或子节点上的组件（形状桩，永远返回 null，只保证能编译）。</summary>
-        public T? GetComponent<T>() where T : Component
+        /// <summary>取自身或子节点上的组件（形状桩，运行期返回 null）。Unity 自己不标注可空，这里照抄其表面。</summary>
+        public T GetComponent<T>() where T : Component
         {
-            return null;
+            return null!;
         }
 
         /// <summary>取子节点上的组件（形状桩）。</summary>
-        public T? GetComponentInChildren<T>() where T : Component
+        public T GetComponentInChildren<T>() where T : Component
         {
-            return null;
+            return null!;
         }
 
         /// <summary>加组件（形状桩）。</summary>
         public T AddComponent<T>() where T : Component, new()
         {
             return new T();
+        }
+
+        /// <summary>取子物体上的组件（含未激活，形状桩）。</summary>
+        public T[] GetComponentsInChildren<T>(bool includeInactive) where T : Component
+        {
+            return Array.Empty<T>();
         }
     }
 
@@ -287,6 +293,8 @@ namespace UnityEngine
         }
     }
 }
+
+
 
 
 

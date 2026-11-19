@@ -23,7 +23,7 @@ namespace AIFramework.Demo.Editor
             EnsureFolder("Assets/AIFrameworkDemo/Scenes");
 
             var host = new GameObject("AIFrameworkBehaviour");
-            host.AddComponent<AIFrameworkBehaviour>();
+            var behaviour = host.AddComponent<AIFrameworkBehaviour>();
 
             GameObject shield = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             shield.name = "ShieldUnit";
@@ -37,6 +37,20 @@ namespace AIFramework.Demo.Editor
             projectile.name = "IncomingProjectile";
             projectile.transform.position = new Vector3(0f, 0f, 1.4f);
             projectile.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
+
+            // 把两个胶囊的碰撞体喂给 Behaviour：没有这份清单，Play 时它会认为"没有可绑定单位"而空转。
+            var units = new Collider[2];
+            units[0] = shield.GetComponent<Collider>();
+            units[1] = attacker.GetComponent<Collider>();
+            var serialized = new SerializedObject(behaviour);
+            SerializedProperty sceneUnits = serialized.FindProperty("_sceneUnits");
+            sceneUnits.arraySize = units.Length;
+            for (int i = 0; i < units.Length; i++)
+            {
+                sceneUnits.GetArrayElementAtIndex(i).objectReferenceValue = units[i];
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();

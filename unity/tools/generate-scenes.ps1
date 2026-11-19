@@ -111,7 +111,7 @@ while ((Get-Date) -lt $deadline) {
         continue
     }
 
-    if ($content -match '全部场景生成完成' -or $content -match 'Exiting without the bug reporter') {
+    if ($content -match '全部场景生成完成' -or $content -match '场景装配校验失败' -or $content -match 'Exiting without the bug reporter') {
         $completed = $true
         break
     }
@@ -125,6 +125,12 @@ Start-Sleep -Seconds 2
 
 if (-not (Test-Path $logPath)) {
     throw "Unity 没有写出日志，说明它没真正启动（检查许可证 / 是否已有实例占用了副本目录）：$logPath"
+}
+
+$verifyFailures = Select-String -Path $logPath -Pattern '场景装配校验失败|校验失败（'
+if ($verifyFailures) {
+    $verifyFailures | Select-Object -First 20 | ForEach-Object { Write-Host $_.Line }
+    throw "场景装配校验失败，已中止写回（看上面的失败项，或 GeneratedScenes 日志：$logPath）"
 }
 
 $compileErrors = Select-String -Path $logPath -Pattern 'error CS'

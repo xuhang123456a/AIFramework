@@ -36,6 +36,9 @@ namespace AIFramework.Demo.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
+            // 生成完立刻校验：字段漏注入这类问题只有真 Unity 能发现（编译期与形状校验都看不见）。
+            SceneVerifier.VerifyAll();
+
             Debug.Log("[AIFramework] 全部场景生成完成。");
         }
     }

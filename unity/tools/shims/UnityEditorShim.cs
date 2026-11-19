@@ -148,6 +148,15 @@ namespace UnityEditor
 
         /// <summary>字符串值。</summary>
         public string stringValue { get; set; } = string.Empty;
+
+        /// <summary>数组长度（桩：可读写）。</summary>
+        public int arraySize { get; set; }
+
+        /// <summary>取数组元素（桩：返回新属性）。</summary>
+        public SerializedProperty GetArrayElementAtIndex(int index)
+        {
+            return new SerializedProperty();
+        }
     }
 
     /// <summary>选中项桩。</summary>
@@ -241,6 +250,12 @@ namespace UnityEditor.SceneManagement
         {
             return default;
         }
+
+        /// <summary>打开场景（桩：返回空场景）。</summary>
+        public static Scene OpenScene(string scenePath)
+        {
+            return default;
+        }
     }
 }
 
@@ -259,6 +274,12 @@ namespace UnityEngine.SceneManagement
         public bool IsValid()
         {
             return true;
+        }
+
+        /// <summary>取根物体（桩：空数组）。</summary>
+        public GameObject[] GetRootGameObjects()
+        {
+            return Array.Empty<GameObject>();
         }
     }
 
@@ -282,6 +303,8 @@ namespace UnityEngine.SceneManagement
         }
     }
 }
+
+
 
 
 
