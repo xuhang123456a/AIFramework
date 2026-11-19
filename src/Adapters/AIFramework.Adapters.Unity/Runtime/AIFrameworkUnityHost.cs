@@ -7,6 +7,7 @@ using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Localization;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Ports;
+using AIFramework.Contracts.Services;
 using AIFramework.Contracts.Ui;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
@@ -87,6 +88,8 @@ namespace AIFramework.Adapters.Unity
         /// <summary>空间查询端口；场景侧的 <c>RegisterCollider</c> 也走它。</summary>
         private readonly UnitySpatialQuery _spatial;
 
+        private readonly UnityVfxService _vfx;
+
         /// <summary>内核工厂；宿主通过它 <c>Begin</c> 会话，再用 <see cref="UnityKernelFactory.LastRealtime"/> 拿战局引用。</summary>
         private readonly UnityKernelFactory _factory;
 
@@ -161,6 +164,7 @@ namespace AIFramework.Adapters.Unity
             _storage = new UnityStoragePort(storageSubDirectory);
             _assets = new UnityAssetLoader();
             _spatial = new UnitySpatialQuery(spatialBufferCapacity, spatialLayerMask);
+            _vfx = new UnityVfxService(_logger);
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
 
             // 工厂要拿表加载器组卡牌，所以它必须在表加载器之后构造。
@@ -238,6 +242,12 @@ namespace AIFramework.Adapters.Unity
         }
 
         /// <summary>空间查询端口：场景对象要靠它把 <c>Collider</c> 绑成战场句柄。</summary>
+        /// <summary>特效服务端口：业务只发"播什么"，池/资源/回收由适配层决定。</summary>
+        public UnityVfxService Vfx
+        {
+            get { return _vfx; }
+        }
+
         public UnitySpatialQuery Spatial
         {
             get { return _spatial; }
@@ -339,7 +349,8 @@ namespace AIFramework.Adapters.Unity
             // 场景卸载时未结算的对局直接丢弃引用：BattleWorld 是纯内存对象，没有原生资源需要释放。
             if (_sessions.HasActiveSession)
             {
-                _sessions.Release();
+                _vfx.Dispose();
+            _sessions.Release();
             }
         }
 

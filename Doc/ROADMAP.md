@@ -55,36 +55,21 @@
 |---|---|---|---|
 | T3-1 | 配置表导出器（Luban 替代） | JSON schema + 导出 + 12 表逐字节等价 + `--check` 门禁 | [x] `tools/tablegen` + `tables/*.json` + 29 例；CI 双目标交叉校验 |
 | T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [x] 组件 + 导出器 + 文档（真机菜单待人眼验） |
-| T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] v1 包络 + CRC32 已有；**版本迁移未做**（下一轮） |
+| T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [x] v2 包络 + CRC32 + schemaVersion + 迁移链（见 T3-17） |
 | T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [x] UnitySceneDirector + SceneNavigator + BootController；PlayMode 覆盖 |
-| T3-5 | 通用 UI 框架 | 弹窗栈/安全区/层级/Toast/Loading | [~] 弹窗栈 + SafeAreaFitter + CanvasSortOrder 已做；**Toast/Loading 未做** |
+| T3-5 | 通用 UI 框架 | 弹窗栈/安全区/层级/Toast/Loading | [x] 弹窗栈 + SafeAreaFitter + CanvasSortOrder + Toast/Loading（见 T3-15） |
 | T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [x] Core 17 例 + ArenaScene 逐帧指纹回放（PlayMode） |
 | T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [x] NetworkContracts + MatchValidationLedger 13 例（HTTP 未接线） |
 | T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [~] 方案文档（Doc/07）；**未安装**（需动 Packages，待用户在关编辑器时授权） |
 | T3-9 | 本地化 | 文案表 + 语言切换 + 回退 | [x] 切片 33 例 + 2 套夹具表 + LobbyScene 切语言（真机） |
-| T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [~] 音频端口 + 双端实现 32 例已做；**VFX 端口未做** |
-| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] FrameProfiler/PerformanceHud + PlayMode 采样 + 回合内核 0 分配门禁；**Realtime 帧分配门禁未做** |
+| T3-10 | 音频/特效端口 | IAudioPort / IVfxService + 适配实现 | [x] 音频 32 例 + 特效 19 例 + 双端实现 + 宿主接线 |
+| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [x] FrameProfiler/PerformanceHud + PlayMode 采样 + 回合内核 0 分配门禁 + Realtime Unity 内 600 帧 ≤1KB 门禁 |
 | T3-12 | 编辑器工具 | 关卡/场景/数值表校验 | [x] UIBindExporter + OneClickTools（一键校验）+ GenerateAllScenes/SceneVerifier |
-| T3-13 | CI/CD | build/test/viewgen/tablegen/形状校验/出包 | [~] 纯逻辑五道闸门已进 CI；**Unity 出包需 license，只做本地脚本**（已文档化） |
+| T3-13 | CI/CD | build/test/viewgen/tablegen/形状校验/出包 | [x] 纯逻辑五道闸门进 CI；Unity 闸门走 `unity-gated.yml`（需 license，默认不跑）+ 本地脚本 |
 | T3-14 | 云存档 | 远端实现 + 冲突策略 | [x] 端口 + CloudSaveMerger 34 例 + 双端实现（HTTP 未接线） |
-| T3-15 | Toast/Loading 层 | 轻提示 + 转圈遮罩，接 IPopupQueue 之外的一条通道 | [ ] |
-| T3-16 | VFX 端口 | IVfxService + Unity 粒子池 + Console 记录 | [ ] |
-| T3-17 | 存档版本迁移 | v1→v2 schema 迁移 + 迁移链测试 + 损坏回退 | [ ] |
----|---|---|---|
-| T3-1 | Luban 真表接入 | 替换 12 字节夹具，schema + 导出 + 加载器 | [ ] |
-| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [x] 组件 + 导出器 + 文档（真机菜单待验） |
-| T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
-| T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [~] 第一版（UnitySceneDirector，同步加载 + 异常兜底） |
-| T3-5 | 通用 UI 框架 | 弹窗栈/Toast/Loading/红点绑定 | [ ] |
-| T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [x] Core 录制/播放/指纹 + 16 例 |
-| T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [ ] |
-| T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [ ] |
-| T3-9 | 本地化 | 文案表 + 语言切换 + TMP 回退 | [ ] |
-| T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [ ] |
-| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] 回合内核 0 分配门禁已加；Realtime 帧分配门禁与 Profiler 采样待补 |
-| T3-12 | 编辑器工具 | 关卡编辑器、技能编辑器、数值表校验 | [ ] |
-| T3-13 | CI/CD | GitHub Actions：build/test/viewgen check/形状校验/出包 | [~] 工作流已落地（.github/workflows/ci.yml），出包待补 |
-| T3-14 | 云存档 | IStoragePort 远端实现 + 冲突策略 | [ ] |
+| T3-15 | Toast/Loading 层 | 轻提示 + 转圈遮罩 | [x] ToastHud + LoadingOverlay + Lobby OverlayLayer + PlayMode 3 例 |
+| T3-16 | VFX 端口 | IVfxService + Unity 池 + Console 记录 | [x] 契约 + 池实现 + 双端 19 例 + 宿主接线 |
+| T3-17 | 存档版本迁移 | v1→v2 schema 迁移 + 迁移链测试 + 损坏回退 | [x] SaveMigrations + codec v2 + SaveService schemaVersion + 42 例 |
 
 ---
 
