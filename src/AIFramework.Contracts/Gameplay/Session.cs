@@ -7,7 +7,13 @@ namespace AIFramework.Contracts.Gameplay
     public enum GameplayKernelType
     {
         Turn = 0,
-        Realtime = 1
+        Realtime = 1,
+
+        /// <summary>卡牌回合战斗：Kernel.Turn 的第二套内容，验证同一内核可承载不同规则。</summary>
+        CardBattle = 2,
+
+        /// <summary>三消棋盘：Kernel.Turn 的第三套内容，验证网格与级联同属回合流。</summary>
+        Match3 = 3
     }
 
     /// <summary>

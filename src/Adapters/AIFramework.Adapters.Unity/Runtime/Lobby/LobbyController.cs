@@ -2,6 +2,7 @@
 using System;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
+using AIFramework.Core.Save;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Mail;
@@ -79,6 +80,7 @@ namespace AIFramework.Adapters.Unity.Lobby
                 battleButton.onClick.AddListener(OnBattleClicked);
             }
 
+            TryLoadInventory();
             SetStatus("装载完成：" + DescribeAvailability(host));
         }
 
@@ -94,6 +96,8 @@ namespace AIFramework.Adapters.Unity.Lobby
             {
                 battleButton.onClick.RemoveListener(OnBattleClicked);
             }
+
+            SaveInventory();
 
             _signIn?.Dispose();
             _signIn = null;
@@ -115,6 +119,7 @@ namespace AIFramework.Adapters.Unity.Lobby
         public void RefreshAfterClaim()
         {
             RefreshAll();
+            SaveInventory();
             SetStatus("领取结果已刷新");
         }
 
@@ -165,8 +170,67 @@ namespace AIFramework.Adapters.Unity.Lobby
             }
 
             RefreshAll();
+            SaveInventory();
             SetStatus("战斗结束：帧=" + frames + " 胜负=" + result.IsVictory + " 反射="
                 + (sandbox != null ? sandbox.ReflectedCount : 0));
+        }
+
+        /// <summary>
+        /// 读档：把上次落盘的背包灌回账本。<b>为什么不存整个宿主状态</b>：
+        /// 任务/邮件可由子表重建，只有玩家资产需要持久化；存得越少，版本迁移越省心。
+        /// </summary>
+        private void TryLoadInventory()
+        {
+            AIFrameworkUnityHost? host = _host;
+            if (host == null)
+            {
+                return;
+            }
+
+            SaveService? save = host.LobbySave;
+            if (save == null)
+            {
+                return;
+            }
+
+            if (!save.TryLoad(0, out SaveEnvelope envelope))
+            {
+                host.Log.Info("[Lobby] 无可用存档，按新档开始。");
+                return;
+            }
+
+            if (!InventorySaveCodec.TryDecode(envelope.Payload, out InventoryEntrySnapshot[] entries))
+            {
+                host.Log.Error("[Lobby] 背包存档损坏，已按新档处理（旧档保留原样，便于排查）。");
+                return;
+            }
+
+            for (int i = 0; i < entries.Length; i++)
+            {
+                host.Inventory.Seed(entries[i].ItemId, entries[i].Count);
+            }
+
+            host.Log.Info("[Lobby] 已读档：v" + envelope.Version + "，" + entries.Length + " 种道具。");
+        }
+
+        /// <summary>存档：只把背包快照写盘，走 <see cref="SaveService"/> 的 CRC 包络。</summary>
+        private void SaveInventory()
+        {
+            AIFrameworkUnityHost? host = _host;
+            if (host == null)
+            {
+                return;
+            }
+
+            SaveService? save = host.LobbySave;
+            if (save == null)
+            {
+                return;
+            }
+
+            var query = new InventoryListQueryRequest();
+            InventoryListSnapshot snapshot = host.Bus.Query<InventoryListQueryRequest, InventoryListSnapshot>(in query);
+            save.Save(0, new SaveEnvelope(1, InventorySaveCodec.Encode(snapshot.Items)));
         }
 
         private void SetStatus(string message)

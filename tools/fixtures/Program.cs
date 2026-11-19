@@ -38,6 +38,7 @@ namespace AIFramework.Fixtures
                 WriteShop(target);
                 WriteQuest(target);
                 WriteMail(target);
+                WriteCard(target);
                 Console.WriteLine("已生成夹具：" + Path.GetFullPath(target));
             }
 
@@ -116,6 +117,28 @@ namespace AIFramework.Fixtures
                 writer.Write(rewardItemId);
                 writer.Write(rewardCount);
                 writer.Write(sendDayOffset);
+            });
+        }
+
+        private static void WriteCard(string directory)
+        {
+            // TbCard: row{cardId, cost, damage, block, copies} —— 20 字节/行
+            var rows = new List<(int CardId, int Cost, int Damage, int Block, int Copies)>
+            {
+                (1, 1, 6, 0, 3),
+                (2, 1, 0, 5, 3),
+                (3, 2, 12, 0, 2),
+                (4, 0, 3, 3, 2)
+            };
+
+            WriteTable(Path.Combine(directory, "TbCard.bin"), rows.Count, (writer, index) =>
+            {
+                (int cardId, int cost, int damage, int block, int copies) = rows[index];
+                writer.Write(cardId);
+                writer.Write(cost);
+                writer.Write(damage);
+                writer.Write(block);
+                writer.Write(copies);
             });
         }
 

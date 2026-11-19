@@ -23,10 +23,10 @@
 
 | # | 场景 | 品类 | 依赖内核/层 | 关键新能力 | 状态 |
 |---|---|---|---|---|---|
-| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [ ] 存档服务已就绪（Core.Save） |
+| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [~] 场景切换/启动场景开发中 |
 | T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片 + Presenter + Unity 装配已完成，缺场景 UI |
-| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [ ] |
-| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [ ] |
+| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [~] 内核开发中 |
+| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [~] 内核开发中 |
 | T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [ ] |
 | T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [ ] |
 | T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [ ] |
@@ -74,7 +74,13 @@
 
 ## 轮次日志（每轮追加，最新在上）
 
-### R3 — 2026-11-20（进行中）
+### R4 — 2026-11-20（进行中）
+- 目标：T1-3 卡牌回合 + T1-4 三消两套内核内容；T1-1 Boot 场景与场景切换
+- 契约：`GameplayKernelType.CardBattle/Match3`；`CardViewData`/`ICardBattleReadView`/`ICardBattleInput`；`IMatch3ReadView`/`IMatch3Input`；`TbCard` 夹具（20 字节/行，84 字节 4 行）
+- 并行作业：`CardBattleWorld`、`Match3World`、`UnitySceneDirector`+`BootController`+`BootSceneBuilder`
+- 下轮：适配层工厂分支 + 两个战斗场景（HUD + SceneBuilder）+ Console 冒烟
+
+### R3 — 2026-11-20
 - 目标：Unity 场景层落地（大厅场景可点）、离线编译校验扩展到编辑器脚本
 - 完成：`SignInHud`/`ShopHud`/`QuestHud`/`MailHud` 四个视图皮肤 + `LobbyController`；`LobbySceneBuilder` 一键建场景（Canvas/四面板/按钮/引用注入）；形状桩扩到 UnityEngine.UI / UnityEditor，`check-adapter-compile.ps1` 现在同时编译 `unity/Assets/**/Editor/**`
 - 下轮：Boot 场景 + SceneDirector（T1-1/T3-4）；卡牌回合内核通用化（T1-3）
