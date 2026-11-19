@@ -42,6 +42,8 @@ namespace AIFramework.Demo.Editor
             RoguelikeSceneBuilder.CreateRoguelikeScene();
             BoardGameSceneBuilder.CreateBoardGameScene();
             TacticsSceneBuilder.CreateTacticsScene();
+            MergeSceneBuilder.CreateMergeScene();
+            AsyncPvpSceneBuilder.CreateAsyncPvpScene();
             TycoonSceneBuilder.CreateTycoonScene();
             IdleRpgSceneBuilder.CreateIdleRpgScene();
             BootSceneBuilder.CreateBootScene();

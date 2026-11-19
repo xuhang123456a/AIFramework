@@ -44,11 +44,11 @@ namespace AIFramework.Adapters.Unity.Battle
     /// </para>
     /// <para>
     /// <b>物理帧时序（真机需知）</b>：工程设置里 <c>Physics.autoSyncTransforms</c> 是关的，
-    /// 本类在 <c>Update</c> 里写 Transform 之后，Unity 要到下一次物理模拟（<c>FixedUpdate</c>）才把位姿同步给 PhysX。
-    /// 影响有限：反射判定（Phase 3）读的是"上一次同步后"的位姿，本场景飞行物 8 单位/秒、每步只走 0.13，
-    /// 而护盾采样圈半径 1.5、飞行物要在圈里穿行约 22 步，滞后一两步不会漏反射。
-    /// 真正的风险在布场当帧——新建碰撞体可能还没同步到目标位姿，
-    /// 要彻底消除需要 <c>Physics.SyncTransforms()</c>（见交付报告的"未验证点"）。
+    /// 所以每次写完 Transform 都必须显式 <c>Physics.SyncTransforms()</c>：逐帧由
+    /// <see cref="RealtimeSceneBinder.Sync"/> 负责，布场当帧由 <see cref="DeployWave"/> 末尾兜底。
+    /// 少了布场这一次同步，新建碰撞体会停在创建位姿，首帧空间查询会读到"所有碰撞体挤在原点"；
+    /// 更关键的是，录制局每波布场后会跨一次帧边界，回放局则在同一帧里连续布场 + <c>Step</c>，
+    /// 两边 PhysX 位姿不同就会让回放从换波首帧开始假不一致。
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]

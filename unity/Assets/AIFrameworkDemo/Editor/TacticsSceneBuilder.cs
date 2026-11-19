@@ -64,11 +64,15 @@ namespace AIFramework.Demo.Editor
         /// <summary>状态行高度（像素）：两行 × 18 号字，留出行距余量。</summary>
         private const float StatusHeight = 52f;
 
-        /// <summary>字符盘高度（像素）：8 行 × 16 号字约 122px，留余量避免最后一行被裁掉。</summary>
-        private const float BoardTextHeight = 168f;
+        /// <summary>字符盘高度（像素）：8 行 × 16 号字、行距 0.85 约 110px，留余量避免最后一行被裁掉。</summary>
+        private const float BoardTextHeight = 150f;
 
-        /// <summary>根容器里各行的间距（像素）。</summary>
-        private const float RowSpacing = 6f;
+        /// <summary>
+        /// 根容器里各行的间距（像素）。<b>为什么压到 4</b>：屏高 90%（1280×720 下 648px）要装
+        /// 状态行 52 + 字符盘 150 + 网格 270 + 三个按钮 114 + 5 道间距 20 + 上下内边距 24 = 630px，
+        /// 只剩 18px 余量；间距取 6 就会超编，最后那个"返回大厅"会被挤出屏幕。
+        /// </summary>
+        private const float RowSpacing = 4f;
 
         /// <summary>普通按钮高度（像素）。</summary>
         private const float ButtonHeight = 38f;

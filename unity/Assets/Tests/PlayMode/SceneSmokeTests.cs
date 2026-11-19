@@ -143,6 +143,18 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator MergeScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<MergePanelController>("MergeScene");
+        }
+
+        [UnityTest]
+        public IEnumerator AsyncPvpScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<AsyncPvpPanelController>("AsyncPvpScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");

@@ -289,6 +289,8 @@ namespace AIFramework.Tests.EditMode
             "Assets/AIFrameworkDemo/Scenes/RoguelikeScene.unity",
             "Assets/AIFrameworkDemo/Scenes/BoardGameScene.unity",
             "Assets/AIFrameworkDemo/Scenes/TacticsScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/MergeScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/AsyncPvpScene.unity",
             "Assets/AIFrameworkDemo/Scenes/TycoonScene.unity",
             "Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity",
             "Assets/AIFrameworkDemo/Scenes/DemoScene.unity"

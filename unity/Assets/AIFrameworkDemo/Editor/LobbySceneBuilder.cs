@@ -168,6 +168,8 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "RoguelikeButton", "进入肉鸽卡牌场景", "RoguelikeScene");
             CreateSceneEntry(root, "BoardGameButton", "进入棋类场景", "BoardGameScene");
             CreateSceneEntry(root, "TacticsButton", "进入战棋场景", "TacticsScene");
+            CreateSceneEntry(root, "MergeButton", "进入合成场景", "MergeScene");
+            CreateSceneEntry(root, "AsyncPvpButton", "进入异步PVP场景", "AsyncPvpScene");
             CreateSceneEntry(root, "TycoonButton", "进入模拟经营场景", "TycoonScene");
             CreateSceneEntry(root, "IdleRpgButton", "进入挂机 RPG 场景", "IdleRpgScene");
 
