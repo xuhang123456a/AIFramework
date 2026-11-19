@@ -41,6 +41,14 @@ namespace AIFramework.Kernel.Realtime
         /// <summary>飞行物判定半径（命中条件：中心距 &lt;= 单位半径 + 本半径）。</summary>
         private const float ProjectileRadius = 0.1f;
 
+        /// <summary>
+        /// 飞行物出界回收半径（米）：坐标绝对值超过它就回收槽位。
+        /// <b>为什么必须有</b>：契约里没有 despawn 通道，内核原先只在命中时回收槽位，
+        /// 打空/出界的弹幕会永久占槽并被 Phase 4 每帧扫描——弹幕玩法（如竞技场/弹幕场景）
+        /// 跑满 1200 帧后会把 <c>unitCapacity*2</c> 的槽位打满，新弹幕静默生成失败。
+        /// </summary>
+        private const float ProjectileDespawnRadius = 40f;
+
         /// <summary>被打断后施加的硬直帧数（60 fps 下约 1/6 秒）。</summary>
         private const int InterruptControlFrames = 10;
 

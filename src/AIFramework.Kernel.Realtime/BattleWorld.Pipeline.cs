@@ -130,6 +130,13 @@ namespace AIFramework.Kernel.Realtime
 
                 projectile.PreviousPosition = projectile.Position;
                 projectile.Position = projectile.Position + (projectile.Velocity * deltaSeconds);
+
+                // 出界回收：避免打空的弹幕永久占槽（契约没有 despawn 通道，只能由内核按边界回收）。
+                if (Math.Abs(projectile.Position.X) > ProjectileDespawnRadius
+                    || Math.Abs(projectile.Position.Y) > ProjectileDespawnRadius)
+                {
+                    RecycleProjectile(i);
+                }
             }
 
             ArbitrateReflectIntents();
