@@ -102,6 +102,7 @@ namespace AIFramework.Adapters.Console
             RunStorageSmoke(signIn);
 
             RunLobbyDemo();
+            CartridgeShowcase.Run(_writer);
             PublishBattleFacts();
             CleanupStorage();
 

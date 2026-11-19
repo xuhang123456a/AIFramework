@@ -10,9 +10,9 @@ namespace AIFramework.Kernel.Turn.AutoChess
     /// 自走棋沙盒（<see cref="GameplayKernelType.AutoChess"/>）：Kernel.Turn 的第六套内容，
     /// 验证"确定性模拟 + 阵容构筑"能挂在同一套回合进出门上。
     /// <para>
-    /// <b>为什么不新增 <c>GameplayKernelType</c> 枚举值</b>：自走棋对主板而言只是"另一个回合制会话"——
-    /// 进门拿 <see cref="GameplayInitData"/>（<c>UnitCount</c> 决定备战席人数、<c>RandomSeed</c> 决定走位随机流），
-    /// 出门交 <see cref="GameplayResult"/>；新增枚举值会强逼装配层与存档协议同步扩容，收益为零。
+    /// <b>为什么在 <see cref="GameplayKernelType"/> 里有专属值</b>：装配层只认识枚举、不认识内核具体类型，
+    /// 必须靠它把会话派给 <see cref="AutoChessWorld"/> 并在结算时区分卡带；内核本体仍然只依赖
+    /// <see cref="IGameplaySession"/> 那一组进出门契约，多一个枚举值不会让内核多知道任何东西。
     /// </para>
     /// <para>
     /// <b>规则（Phase 1，测试逐条验证）</b>：棋盘 8×8，玩家半场 <c>y = 0..3</c>、敌方半场 <c>y = 4..7</c>；
