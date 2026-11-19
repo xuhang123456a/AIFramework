@@ -208,8 +208,8 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>
         /// 累计反射次数（已结束波次 + 当前波实时值）。
-        /// <b>为什么是 internal 而不是 public</b>：公开面锁定为三个只读属性，这是给同程序集的
-        /// <see cref="ArenaHud"/> 拼状态行用的诊断值，不该出现在场景对外契约里。
+        /// <b>为什么是 internal 而不是 public</b>：公开面只放"波次/胜负/回放结果"这类场景契约，
+        /// 这是给同程序集的 <see cref="ArenaHud"/> 拼状态行用的诊断值，不该出现在场景对外契约里。
         /// </summary>
         internal int ReflectedCount
         {
@@ -549,6 +549,12 @@ namespace AIFramework.Adapters.Unity.Battle
                     binder.AddProjectile(projectile, muzzle, ProjectileRadius, "Projectile_" + wave + "_" + i);
                 }
             }
+
+            // 布场当帧显式同步物理位姿：新建碰撞体默认停在创建时的位姿，而工程里
+            // Physics.autoSyncTransforms 是关的。若不在第一次 Step 前同步，首帧空间查询会读到
+            // "所有碰撞体挤在原点"这种假状态；更关键的是，录制局每波布场后会跨一次帧边界，
+            // 回放局则在同一帧里连续布场 + Step，两者的 PhysX 位姿会因此分叉，回放必然假不一致。
+            Physics.SyncTransforms();
 
             return protagonist;
         }
