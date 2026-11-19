@@ -77,6 +77,18 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator TetrisScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<TetrisController>("TetrisScene");
+        }
+
+        [UnityTest]
+        public IEnumerator AutoChessScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<AutoChessController>("AutoChessScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");

@@ -280,6 +280,8 @@ namespace AIFramework.Tests.EditMode
             "Assets/AIFrameworkDemo/Scenes/IdleScene.unity",
             "Assets/AIFrameworkDemo/Scenes/GachaScene.unity",
             "Assets/AIFrameworkDemo/Scenes/PuzzleScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/TetrisScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/AutoChessScene.unity",
             "Assets/AIFrameworkDemo/Scenes/DemoScene.unity"
         };
 

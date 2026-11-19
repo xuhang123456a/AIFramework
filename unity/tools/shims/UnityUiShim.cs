@@ -47,6 +47,9 @@ namespace UnityEngine.UI
 
         /// <summary>对齐方式。</summary>
         public TextAnchor alignment;
+
+        /// <summary>行距倍率（1 = 默认；字符网格用 0.85 让 20 行塞进固定高度的文本控件）。</summary>
+        public float lineSpacing = 1f;
     }
 
     /// <summary>图片控件。</summary>
