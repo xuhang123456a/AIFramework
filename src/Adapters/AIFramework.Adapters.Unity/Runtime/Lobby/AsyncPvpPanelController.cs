@@ -126,11 +126,19 @@ namespace AIFramework.Adapters.Unity.Lobby
             }
         }
 
-        /// <summary>重新查一次对手池并记在手上；总线未装配时把池子清空（面板会画"对手池为空"）。</summary>
+        /// <summary>
+        /// 重新查一次对手池并记在手上；切片未装配（总线为空或处理器注册失败）时把池子清空，
+        /// 面板会画"对手池为空"。
+        /// <para>
+        /// <b>为什么必须连处理器一起判</b>：对手池查询处理器是随切片注册的，
+        /// 装配失败时总线还在、查询却没人接——只判总线会在这里抛"未注册处理器"，
+        /// 把"面板已禁用"变成每个 Start 一条异常。
+        /// </para>
+        /// </summary>
         private void ReloadOpponents()
         {
             ICqeBus? bus = _bus;
-            if (bus == null)
+            if (bus == null || _handler == null)
             {
                 _opponents = null;
                 return;

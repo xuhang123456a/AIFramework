@@ -156,6 +156,42 @@ New-Item -ItemType Directory -Path $sceneTarget -Force | Out-Null
 Copy-Item -Path (Join-Path $workProject 'Assets/AIFrameworkDemo/Scenes/*.unity') -Destination $sceneTarget -Force
 Copy-Item -Path (Join-Path $workProject 'Assets/AIFrameworkDemo/Scenes/*.unity.meta') -Destination $sceneTarget -Force
 
+# 写回缺失的 .meta：场景通过 GUID 引用脚本/资源，而 GUID 存在 .meta 里。
+# 如果只写回 .unity 而不写回 .meta，换一台机器 clone 后 Unity 会重新生成 GUID，
+# 场景里所有脚本引用都会变成 Missing Script——这是最难察觉的一类"在我机器上是好的"。
+function Copy-MissingMetaFiles {
+    param([string]$copyRoot, [string]$repoRoot)
+
+    $copyFull = (Get-Item $copyRoot).FullName
+    $repoFull = (Get-Item $repoRoot).FullName
+    $count = 0
+
+    Get-ChildItem -Recurse -Path $copyFull -Filter *.meta -File | ForEach-Object {
+        $relative = $_.FullName.Substring($copyFull.Length).TrimStart([char]'\')
+        $assetRelative = $relative -replace '\.meta$', ''
+        $assetPath = Join-Path $repoFull $assetRelative
+        $metaPath = Join-Path $repoFull $relative
+
+        if ((Test-Path $assetPath) -and -not (Test-Path $metaPath)) {
+            $parent = Split-Path $metaPath -Parent
+            if (-not (Test-Path $parent)) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+
+            Copy-Item -LiteralPath $_.FullName -Destination $metaPath -Force
+            $count++
+        }
+    }
+
+    return $count
+}
+
+$assetsMetaCount = Copy-MissingMetaFiles (Join-Path $workProject 'Assets') (Join-Path $repoRoot 'unity/Assets')
+$srcMetaCount = Copy-MissingMetaFiles (Join-Path $WorkDir 'src') (Join-Path $repoRoot 'src')
+if (($assetsMetaCount + $srcMetaCount) -gt 0) {
+    Write-Host ("已补写回缺失 .meta：Assets {0} 个 / src {1} 个（保证跨机器 GUID 稳定）" -f $assetsMetaCount, $srcMetaCount)
+}
+
 $buildSettingsSrc = Join-Path $workProject 'ProjectSettings/EditorBuildSettings.asset'
 if (Test-Path $buildSettingsSrc) {
     Copy-Item -LiteralPath $buildSettingsSrc -Destination (Join-Path $repoRoot 'unity/ProjectSettings/EditorBuildSettings.asset') -Force
