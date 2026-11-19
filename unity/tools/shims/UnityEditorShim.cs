@@ -159,6 +159,42 @@ namespace UnityEditor
         /// <summary>当前选中的对象集合。</summary>
         public static UnityEngine.Object[] objects { get; set; } = Array.Empty<UnityEngine.Object>();
     }
+
+    /// <summary>
+    /// Build Settings 里的一条场景记录（桩：只是一个可写容器，不校验场景是否存在、不写回磁盘）。
+    /// </summary>
+    public sealed class EditorBuildSettingsScene
+    {
+        /// <summary>场景资产路径，例如 <c>Assets/AIFrameworkDemo/Scenes/BootScene.unity</c>。</summary>
+        public string path { get; set; } = string.Empty;
+
+        /// <summary>是否勾选进构建。</summary>
+        public bool enabled { get; set; }
+
+        /// <summary>空条目（真实 Unity 也允许无参构造后再赋 <see cref="path"/>）。</summary>
+        public EditorBuildSettingsScene()
+        {
+        }
+
+        /// <summary>以路径与勾选状态构造。</summary>
+        /// <param name="path">场景资产路径。</param>
+        /// <param name="enabled">是否勾选进构建。</param>
+        public EditorBuildSettingsScene(string path, bool enabled)
+        {
+            this.path = path;
+            this.enabled = enabled;
+        }
+    }
+
+    /// <summary>
+    /// 构建设置（桩：读写只在内存里，<b>不会</b>真正落盘到 <c>ProjectSettings/EditorBuildSettings.asset</c>，
+    /// 因此"Build Settings 是否被正确写入"必须真机验证）。
+    /// </summary>
+    public static class EditorBuildSettings
+    {
+        /// <summary>构建场景列表；真实 Unity 里赋值即原子替换整个列表并使资产变脏。</summary>
+        public static EditorBuildSettingsScene[] scenes { get; set; } = Array.Empty<EditorBuildSettingsScene>();
+    }
 }
 
 namespace UnityEditor.SceneManagement
@@ -237,6 +273,12 @@ namespace UnityEngine.SceneManagement
         /// <summary>按索引加载。</summary>
         public static void LoadScene(int sceneBuildIndex)
         {
+        }
+
+        /// <summary>当前激活场景（桩：空场景，名字为空串）。</summary>
+        public static Scene GetActiveScene()
+        {
+            return default;
         }
     }
 }

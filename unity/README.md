@@ -69,6 +69,19 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 - 按 Play 后：点"领取今天"走签到切片，点商品买走商店切片（先扣后给），点"打一场"跑一轮 Realtime 内核并把 `GameFinishedEvent` 喂给任务切片；
 - 子表缺失时对应面板自动降级（Console 会打 `[AIFramework] xxx 装配失败`），不影响其它面板。
 
+## 二之五、场景一览（全部由编辑器菜单生成）
+
+| 菜单项 | 场景 | 玩法 | 状态 |
+|---|---|---|---|
+| `AIFramework/创建演示场景` | `DemoScene` | Realtime 护盾反射最小演示（两个 Capsule + 飞行物） | 已有 |
+| `AIFramework/创建大厅场景` | `LobbyScene` | Meta 主板：签到/商店/任务/邮件 + 打一场 | 已有 |
+| `AIFramework/创建启动场景` | `BootScene` | 启动 → 自动跳 `LobbyScene` | 新增 |
+| `AIFramework/创建卡牌战斗场景` | `CardBattleScene` | Kernel.Turn · CardBattle（抽牌/能量/回合） | 新增 |
+| `AIFramework/创建三消场景` | `Match3Scene` | Kernel.Turn · Match3（交换/消除/级联） | 新增 |
+| `AIFramework/把场景加入 Build Settings` | — | 按 Boot → Lobby → CardBattle → Match3 顺序写入 Build Settings | 新增 |
+
+**场景切换纪律**：Boot 场景**不创建宿主**；每个玩法场景自己 `new AIFrameworkUnityHost()` 并在 `OnDestroy` `Dispose()`（`LoadScene` 是同步的，旧场景对象先销毁，宿主时序自然正确）。
+
 ## 三、把编译守卫接进 Unity（可选，默认不装）
 
 纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。

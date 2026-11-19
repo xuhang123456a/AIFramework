@@ -153,13 +153,15 @@ namespace AIFramework.Adapters.Unity
             _storage = new UnityStoragePort(storageSubDirectory);
             _assets = new UnityAssetLoader();
             _spatial = new UnitySpatialQuery(spatialBufferCapacity, spatialLayerMask);
-            _factory = new UnityKernelFactory(_spatial, UnityKernelFactory.CreateDefaultPhases());
+            _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
+
+            // 工厂要拿表加载器组卡牌，所以它必须在表加载器之后构造。
+            _factory = new UnityKernelFactory(_spatial, UnityKernelFactory.CreateDefaultPhases(), _tableLoader);
             _sessions = new GameplaySessionHost(_factory);
             _bus = new CqeBus();
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _signInView = new NullSignInView(_logger);
-            _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
         }
 
         /// <summary>总线：场景脚本可以自己 <c>Send/Query/Publish</c>，也可注册自己的处理器。</summary>

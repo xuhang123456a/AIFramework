@@ -265,6 +265,27 @@ namespace UnityEngine
     public sealed class DisallowMultipleComponent : Attribute
     {
     }
+
+    /// <summary>
+    /// 引擎异常（形状桩）：真实 Unity 里由 <c>SceneManager.LoadScene</c> 等在"场景不在 Build Settings"时抛出。
+    /// 桩只保证"类型存在、可被 catch、能读到 message"，不复制 Unity 的具体抛出点。
+    /// </summary>
+    public class UnityException : SystemException
+    {
+        public UnityException()
+        {
+        }
+
+        public UnityException(string message)
+            : base(message)
+        {
+        }
+
+        public UnityException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
+    }
 }
 
 

@@ -171,3 +171,64 @@ namespace UnityEngine.EventSystems
     }
 }
 
+namespace UnityEngine.UI
+{
+    /// <summary>
+    /// 网格布局组（形状桩）：三消棋盘靠它把格子排成"宽×高"的表。
+    /// <para>
+    /// <b>为什么必须补这个桩</b>：棋盘容器要在场景里挂 <c>GridLayoutGroup</c> 设 cellSize/constraint，
+    /// 没有桩就编不过建场景脚本；桩只保证符号与真实 API 同形，不含任何排版算法。
+    /// </para>
+    /// </summary>
+    public class GridLayoutGroup : MonoBehaviour
+    {
+        /// <summary>约束模式（与 Unity 同名同序：FixedColumnCount = 固定列数）。</summary>
+        public enum Constraint
+        {
+            Flexible = 0,
+            FixedColumnCount = 1,
+            FixedRowCount = 2
+        }
+
+        /// <summary>起始角（第一个格子的位置）。</summary>
+        public enum Corner
+        {
+            UpperLeft = 0,
+            UpperRight = 1,
+            LowerLeft = 2,
+            LowerRight = 3
+        }
+
+        /// <summary>主轴方向。</summary>
+        public enum Axis
+        {
+            Horizontal = 0,
+            Vertical = 1
+        }
+
+        /// <summary>单元格尺寸。</summary>
+        public Vector2 cellSize = new Vector2(100f, 100f);
+
+        /// <summary>单元格间距。</summary>
+        public Vector2 spacing = new Vector2(0f, 0f);
+
+        /// <summary>内边距。</summary>
+        public RectOffset padding = new RectOffset(0, 0, 0, 0);
+
+        /// <summary>约束模式。</summary>
+        public Constraint constraint;
+
+        /// <summary>约束数量（固定列数/行数时生效）。</summary>
+        public int constraintCount = 2;
+
+        /// <summary>起始角。</summary>
+        public Corner startCorner;
+
+        /// <summary>主轴方向。</summary>
+        public Axis startAxis;
+
+        /// <summary>子项对齐。</summary>
+        public TextAnchor childAlignment;
+    }
+}
+

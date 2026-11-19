@@ -23,10 +23,10 @@
 
 | # | 场景 | 品类 | 依赖内核/层 | 关键新能力 | 状态 |
 |---|---|---|---|---|---|
-| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [~] 场景切换/启动场景开发中 |
+| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [x] Boot 场景 + SceneDirector（真机待验） |
 | T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片 + Presenter + Unity 装配已完成，缺场景 UI |
-| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [~] 内核开发中 |
-| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [~] 内核开发中 |
+| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [x] 内核+测试+场景 |
+| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核+测试+场景 |
 | T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [ ] |
 | T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [ ] |
 | T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [ ] |
@@ -58,7 +58,7 @@
 | T3-1 | Luban 真表接入 | 替换 12 字节夹具，schema + 导出 + 加载器 | [ ] |
 | T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [~] 生成器侧已完备（Number/--all），导出器待做 |
 | T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
-| T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [ ] |
+| T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [~] 第一版（UnitySceneDirector，同步加载 + 异常兜底） |
 | T3-5 | 通用 UI 框架 | 弹窗栈/Toast/Loading/红点绑定 | [ ] |
 | T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [ ] |
 | T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [ ] |
@@ -77,8 +77,10 @@
 ### R4 — 2026-11-20（进行中）
 - 目标：T1-3 卡牌回合 + T1-4 三消两套内核内容；T1-1 Boot 场景与场景切换
 - 契约：`GameplayKernelType.CardBattle/Match3`；`CardViewData`/`ICardBattleReadView`/`ICardBattleInput`；`IMatch3ReadView`/`IMatch3Input`；`TbCard` 夹具（20 字节/行，84 字节 4 行）
-- 并行作业：`CardBattleWorld`、`Match3World`、`UnitySceneDirector`+`BootController`+`BootSceneBuilder`
-- 下轮：适配层工厂分支 + 两个战斗场景（HUD + SceneBuilder）+ Console 冒烟
+- 并行作业全部落地：`CardBattleWorld`（抽牌/能量/护盾/敌人行动/30 回合上限）、`Match3World`（8×8/5 色/级联/重力/步数与目标分）、`UnitySceneDirector`+`BootController`+`BootSceneBuilder`、卡牌与三消场景 + HUD
+- 适配层工厂接上两个新卡带（Console `DemoKernelFactory` / Unity `UnityKernelFactory`，卡牌子表走 `TbCard.bin`）
+- 验证：384 例全绿（Core 172 / Features 129 / Adapters 38 / ViewGen 18 / Arch 27）；Console 冒烟四玩法全通
+- 下轮：T2 扩展（合成/战棋等）+ 表现层补强（进度条/动画钩子）+ Unity 真机验收
 
 ### R3 — 2026-11-20
 - 目标：Unity 场景层落地（大厅场景可点）、离线编译校验扩展到编辑器脚本

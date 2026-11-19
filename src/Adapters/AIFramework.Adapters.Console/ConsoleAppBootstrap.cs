@@ -1,5 +1,6 @@
 using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Gameplay.Turn;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
@@ -61,7 +62,7 @@ namespace AIFramework.Adapters.Console
             int adapterTagId = _registry.Register("adapter.console");
             _bus = new LoggingCqeBus(_innerBus, _log, _registry, adapterTagId);
 
-            _factory = new DemoKernelFactory(_spatial, DemoKernelFactory.DefaultPhases());
+            _factory = new DemoKernelFactory(_spatial, DemoKernelFactory.DefaultPhases(), _tables);
             _host = new GameplaySessionHost(_factory);
         }
 
@@ -92,6 +93,8 @@ namespace AIFramework.Adapters.Console
             SimulateClaim(presenter, signIn, "领取今天");
 
             RunTurnSandbox();
+            RunCardBattleSandbox();
+            RunMatch3Sandbox();
             int realtimeFrames = RunRealtimeSandbox();
 
             ExportCausalLog();
@@ -161,6 +164,82 @@ namespace AIFramework.Adapters.Console
             GameplayResult result = _host.EndAndCollect();
             _writer.WriteLine("[Turn] 胜负=" + result.IsVictory + "，推演步数=" + result.StepCount
                 + "，存活=" + result.RemainingUnits + "，战利品=" + DescribeLoots(result));
+            GrantLoots(result);
+        }
+
+        /// <summary>
+        /// 卡牌战斗冒烟：只通过 <see cref="ICardBattleInput"/> 出牌/结束回合，读取
+        /// <see cref="ICardBattleReadView"/> 做决策——和 UI 拿到的是同一组接口。
+        /// </summary>
+        private void RunCardBattleSandbox()
+        {
+            var init = new GameplayInitData(1, 20261120, 2);
+            IGameplaySession session = _host.Begin(GameplayKernelType.CardBattle, in init);
+
+            var view = (ICardBattleReadView)session;
+            var input = (ICardBattleInput)session;
+            int guard = 0;
+
+            while (!session.IsFinished && guard++ < 400)
+            {
+                bool played = false;
+                for (int i = 0; i < view.HandCount; i++)
+                {
+                    if (input.TryPlayCard(i))
+                    {
+                        played = true;
+                        break;
+                    }
+                }
+
+                if (!played)
+                {
+                    input.EndTurn();
+                }
+
+                session.Step(1f / 60f);
+            }
+
+            GameplayResult result = _host.EndAndCollect();
+            _writer.WriteLine("[CardBattle] 回合=" + view.TurnIndex + " 胜负=" + result.IsVictory
+                + " 敌HP=" + view.EnemyHp + " 我HP=" + view.PlayerHp
+                + " 手牌=" + view.HandCount + " 抽/" + view.DrawPileCount + " 弃/" + view.DiscardPileCount
+                + " 步数=" + result.StepCount + " 战利品=" + DescribeLoots(result));
+            GrantLoots(result);
+        }
+
+        /// <summary>三消冒烟：按固定顺序尝试相邻交换，读取 <see cref="IMatch3ReadView"/> 打印棋盘状态。</summary>
+        private void RunMatch3Sandbox()
+        {
+            var init = new GameplayInitData(1, 20261120, 0);
+            IGameplaySession session = _host.Begin(GameplayKernelType.Match3, in init);
+
+            var view = (IMatch3ReadView)session;
+            var input = (IMatch3Input)session;
+            int guard = 0;
+
+            while (!session.IsFinished && guard++ < 200)
+            {
+                bool swapped = false;
+                for (int y = 0; y < view.Height && !swapped; y++)
+                {
+                    for (int x = 0; x + 1 < view.Width && !swapped; x++)
+                    {
+                        swapped = input.TrySwap(x, y, x + 1, y);
+                    }
+                }
+
+                if (!swapped)
+                {
+                    // 没有可消的相邻交换：走步进让内核推进级联，直到结束。
+                    session.Step(1f / 60f);
+                }
+            }
+
+            GameplayResult result = _host.EndAndCollect();
+            _writer.WriteLine("[Match3] 分数=" + view.Score + "/" + view.TargetScore
+                + " 步数=" + view.MovesLeft + " 胜负=" + result.IsVictory
+                + " 战斗步数=" + result.StepCount + " 战利品=" + DescribeLoots(result));
             GrantLoots(result);
         }
 

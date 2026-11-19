@@ -2,9 +2,12 @@
 using System;
 using System.Collections.Generic;
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Ports;
 using AIFramework.Features.HeroC_Shield;
 using AIFramework.Kernel.Realtime;
 using AIFramework.Kernel.Turn;
+using AIFramework.Kernel.Turn.CardBattle;
+using AIFramework.Kernel.Turn.Match3;
 
 namespace AIFramework.Adapters.Unity
 {
@@ -25,7 +28,23 @@ namespace AIFramework.Adapters.Unity
         /// <param name="spatial">空间查询端口，通常是 <see cref="UnitySpatialQuery"/>。</param>
         /// <param name="phases">技能交互阶段；传 <c>null</c> 时 <see cref="BattleWorld"/> 自己退化成空阶段列表。</param>
         /// <exception cref="ArgumentNullException"><paramref name="spatial"/> 为 <c>null</c>。</exception>
+        /// <summary>卡牌子表加载器；为 <c>null</c> 时卡牌内核用内置牌库。</summary>
+        private readonly IBinaryTableLoader? _cardTable;
+
         public UnityKernelFactory(ISpatialQuery spatial, IReadOnlyList<ISkillInteractionPhase> phases)
+            : this(spatial, phases, null)
+        {
+        }
+
+        /// <summary>注入端口、阶段与卡牌子表加载器。</summary>
+        /// <param name="spatial">空间查询端口。</param>
+        /// <param name="phases">技能交互阶段。</param>
+        /// <param name="cardTable">卡牌子表加载器（可空）。</param>
+        /// <exception cref="ArgumentNullException"><paramref name="spatial"/> 为 <c>null</c>。</exception>
+        public UnityKernelFactory(
+            ISpatialQuery spatial,
+            IReadOnlyList<ISkillInteractionPhase> phases,
+            IBinaryTableLoader? cardTable)
         {
             if (spatial == null)
             {
@@ -34,6 +53,7 @@ namespace AIFramework.Adapters.Unity
 
             _spatial = spatial;
             _phases = phases;
+            _cardTable = cardTable;
         }
 
         /// <summary>
@@ -57,6 +77,19 @@ namespace AIFramework.Adapters.Unity
 
             // 回合制内核不需要空间查询，也没有可注入的运行时对象；这里清掉实时战局引用是刻意的。
             LastRealtime = null;
+
+            if (type == GameplayKernelType.CardBattle)
+            {
+                return _cardTable == null
+                    ? new CardBattleWorld(in init)
+                    : new CardBattleWorld(in init, _cardTable);
+            }
+
+            if (type == GameplayKernelType.Match3)
+            {
+                return new Match3World(in init);
+            }
+
             return new TurnWorld(in init);
         }
 

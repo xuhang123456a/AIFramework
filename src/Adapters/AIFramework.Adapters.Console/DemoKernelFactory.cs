@@ -1,7 +1,10 @@
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Ports;
 using AIFramework.Features.HeroC_Shield;
 using AIFramework.Kernel.Realtime;
 using AIFramework.Kernel.Turn;
+using AIFramework.Kernel.Turn.CardBattle;
+using AIFramework.Kernel.Turn.Match3;
 using System.Collections.Generic;
 
 namespace AIFramework.Adapters.Console
@@ -14,11 +17,16 @@ namespace AIFramework.Adapters.Console
     {
         private readonly ISpatialQuery _spatial;
         private readonly IReadOnlyList<ISkillInteractionPhase> _phases;
+        private readonly IBinaryTableLoader? _cardTable;
 
-        public DemoKernelFactory(ISpatialQuery spatial, IReadOnlyList<ISkillInteractionPhase> phases)
+        public DemoKernelFactory(
+            ISpatialQuery spatial,
+            IReadOnlyList<ISkillInteractionPhase> phases,
+            IBinaryTableLoader? cardTable = null)
         {
             _spatial = spatial;
             _phases = phases;
+            _cardTable = cardTable;
         }
 
         public BattleWorld? LastRealtime { get; private set; }
@@ -33,6 +41,20 @@ namespace AIFramework.Adapters.Console
             }
 
             LastRealtime = null;
+
+            if (type == GameplayKernelType.CardBattle)
+            {
+                // 有子表就按配置组牌，没有就用内核内置牌库（冒烟/单测形态）。
+                return _cardTable == null
+                    ? new CardBattleWorld(in init)
+                    : new CardBattleWorld(in init, _cardTable);
+            }
+
+            if (type == GameplayKernelType.Match3)
+            {
+                return new Match3World(in init);
+            }
+
             return new TurnWorld(in init);
         }
 
