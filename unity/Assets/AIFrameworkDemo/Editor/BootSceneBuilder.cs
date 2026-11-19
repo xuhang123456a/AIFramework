@@ -86,6 +86,8 @@ namespace AIFramework.Demo.Editor
             var scenes = new List<EditorBuildSettingsScene>(2);
             AddIfSceneExists(scenes, BootScenePath);
             AddIfSceneExists(scenes, LobbyScenePath);
+            AddIfSceneExists(scenes, CardBattleScenePath);
+            AddIfSceneExists(scenes, Match3ScenePath);
 
             if (scenes.Count == 0)
             {
@@ -129,6 +131,12 @@ namespace AIFramework.Demo.Editor
         /// <summary>把存在的场景追加进待写入列表；不存在的只提示、不写入。</summary>
         /// <param name="scenes">待写入列表。</param>
         /// <param name="assetPath">场景资产路径。</param>
+        /// <summary>卡牌战斗场景路径（与 <c>CardBattleSceneBuilder</c> 保持一致）。</summary>
+        private const string CardBattleScenePath = "Assets/AIFrameworkDemo/Scenes/CardBattleScene.unity";
+
+        /// <summary>三消场景路径（与 <c>Match3SceneBuilder</c> 保持一致）。</summary>
+        private const string Match3ScenePath = "Assets/AIFrameworkDemo/Scenes/Match3Scene.unity";
+
         private static void AddIfSceneExists(List<EditorBuildSettingsScene> scenes, string assetPath)
         {
             if (!SceneFileExists(assetPath))

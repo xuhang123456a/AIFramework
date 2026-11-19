@@ -227,15 +227,31 @@ namespace AIFramework.Demo.Editor
 
             go.AddComponent<Button>();
 
-            var text = go.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.text = label;
-            text.fontSize = 16;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.color = new Color(0.9f, 0.9f, 0.9f, 1f);
+            // 文字必须是子物体：同一个 GameObject 上只能有一个 Graphic（Image 与 Text 都继承 Graphic），
+            // 直接挂在根上 Unity 会报 "Can't add 'Text' ... because a 'Image' is already added"。
+            AttachLabelChild(go.transform, label, TextAnchor.MiddleLeft);
 
             SetHeight(go, RowHeight);
             return go;
+        }
+
+        /// <summary>给容器挂一个撑满父级的文字子物体（Graphic 互斥规则要求文字单独成物体）。</summary>
+        private static void AttachLabelChild(Transform parent, string label, TextAnchor alignment)
+        {
+            var textGo = new GameObject("Label");
+            var textRect = textGo.AddComponent<RectTransform>();
+            textRect.SetParent(parent, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+
+            var text = textGo.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.text = label;
+            text.fontSize = 16;
+            text.alignment = alignment;
+            text.color = new Color(0.9f, 0.9f, 0.9f, 1f);
         }
 
         private static void SetHeight(GameObject target, float height)
