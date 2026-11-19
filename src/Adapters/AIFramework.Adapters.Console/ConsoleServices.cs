@@ -349,6 +349,27 @@ namespace AIFramework.Adapters.Console
                 + " 活跃音效=" + audio.ActiveVoiceCount
                 + " 事件=" + JoinEvents(log));
 
+            var vfx = new ConsoleVfxService();
+            vfx.Play(new VfxRequest(1001, 1.5f, 2.25f, 1f, 0.5f));
+            writer.WriteLine("[Vfx] 活跃=" + vfx.ActiveCount + " 事件=" + JoinEvents(vfx.DrainLog()));
+
+            // 自检场景没有 TextWriter，这里用 StringWriter 接住冲刷输出，再打一行汇总。
+            var analytics = new ConsoleAnalyticsService(new System.IO.StringWriter());
+            analytics.Track(new AnalyticsEvent(AnalyticsEventIds.SceneEnter, 1f, 0f, 0f, "LobbyScene"));
+            analytics.Track(new AnalyticsEvent(AnalyticsEventIds.BattleEnd, 1f, 12.5f, 0f, "Arena"));
+            analytics.Flush();
+            writer.WriteLine("[Track] 接受=" + analytics.AcceptedCount + " 丢弃=" + analytics.DroppedCount);
+            var iapLedger = new IapPurchaseLedger(new AcceptAllReceiptValidator());
+            var iap = new ConsoleIapService(iapLedger);
+            IapPurchaseResult goldPurchase = iap.Purchase(ConsoleIapService.ProductGold60);
+            IapPurchaseResult goldRepeat = iap.Purchase(ConsoleIapService.ProductGold60);
+            IapPurchaseResult noAds = iap.Purchase(ConsoleIapService.ProductNoAds);
+            IapPurchaseResult noAdsRepeat = iap.Purchase(ConsoleIapService.ProductNoAds);
+            writer.WriteLine(
+                "[Iap] 金币=" + goldPurchase.State + " 再买金币=" + goldRepeat.State
+                + " 去广告=" + noAds.State + " 重复购买=" + noAdsRepeat.State
+                + " 恢复=" + iap.RestorePurchases().Length + " 台账=" + iapLedger.RecordCount);
+
             var ledger = new MatchValidationLedger();
             var normal = new MatchSummary(
                 kernelType: 2, levelId: 1, randomSeed: 20261120, frameCount: 600, stateFingerprint: 0x5EEDL, score: 1200);
@@ -363,6 +384,15 @@ namespace AIFramework.Adapters.Console
                 + " 重复=" + duplicate.Result + "(" + duplicate.Reason + ")"
                 + " 离谱分数=" + rejected.Result + "(" + rejected.Reason + ")"
                 + " 已登记=" + ledger.Count + "/" + ledger.Capacity);
+        }
+
+        /// <summary>自检用"收据恒真"校验器：只验证链路，不冒充真实验签。</summary>
+        private sealed class AcceptAllReceiptValidator : IReceiptValidator
+        {
+            public bool Validate(string productId, string receipt)
+            {
+                return !string.IsNullOrEmpty(productId) && !string.IsNullOrEmpty(receipt);
+            }
         }
 
         /// <summary>格式化音量（固定两位小数、固定不变文化，保证 CI 输出可比对）。</summary>

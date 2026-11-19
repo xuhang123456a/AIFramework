@@ -124,6 +124,12 @@ namespace AIFramework.Tests.EditMode
             using AIFrameworkUnityHost host = CreateHost();
 
             Assert.IsTrue(host.LocalizationAvailable, "本地化切片缺表：TbLocalization.bin。");
+
+            // 成就切片：TbAchievement.bin 必须装配成功（表缺失会被静默降级，这里要把它暴露出来）。
+            Assert.IsTrue(host.AchievementAvailable, "成就切片缺表：TbAchievement.bin。");
+
+            // IAP 端口：本地假商店无后端时如实不可用，有存储后端才可用。
+            Assert.IsTrue(host.Iap.IsAvailable, "IAP 端口应接上本地假商店（有存储后端即可用）。");
             Assert.AreEqual(GameLanguage.ChineseSimplified, host.Localization.CurrentLanguage, "默认语言应是简体中文。");
 
             var play = new LocalizationQueryRequest("ui.play");

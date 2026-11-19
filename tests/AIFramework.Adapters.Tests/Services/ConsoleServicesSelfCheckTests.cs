@@ -32,7 +32,7 @@ namespace AIFramework.Adapters.Tests.Services
                 _output.WriteLine(line);
             }
 
-            Assert.Equal(3, writer.Lines.Count);
+            // 自检行数：Audio×2 + Vfx + Track + Validate（新增服务都会追加一行，这里是"接线完整"的护栏）。`n            Assert.Equal(6, writer.Lines.Count);
 
             // 第 1 行：Master/Bgm 按设置值，Sfx 传 2f 必须被夹成 1.00，Voice 未设过保持默认 1.00。
             Assert.StartsWith("[Audio] 音量", writer.Lines[0]);
@@ -47,13 +47,30 @@ namespace AIFramework.Adapters.Tests.Services
             Assert.Contains("活跃音效=2", writer.Lines[1]);
             Assert.Contains("bgm#7, sfx#1001, sfx#1002", writer.Lines[1]);
 
-            // 第 3 行：正常接受、重复指纹拒绝、离谱分数拒绝；被拒的不登记，所以台账只有 1 条。
-            Assert.StartsWith("[Validate]", writer.Lines[2]);
-            Assert.Contains("正常=Accepted", writer.Lines[2]);
-            Assert.Contains("分=1200", writer.Lines[2]);
-            Assert.Contains("重复=Rejected(duplicate)", writer.Lines[2]);
-            Assert.Contains("离谱分数=Rejected(score exceeds plausible maximum)", writer.Lines[2]);
-            Assert.Contains("已登记=1/256", writer.Lines[2]);
+            // 第 3 行：特效端口能收请求并给出活跃数/事件日志。
+            Assert.StartsWith("[Vfx]", writer.Lines[2]);
+            Assert.Contains("活跃=1", writer.Lines[2]);
+            Assert.Contains("vfx#1001", writer.Lines[2]);
+
+            // 第 4 行：埋点端口接受 2 条、丢弃 0 条。
+            Assert.StartsWith("[Track]", writer.Lines[3]);
+            Assert.Contains("接受=2", writer.Lines[3]);
+            Assert.Contains("丢弃=0", writer.Lines[3]);
+
+            // 第 5 行：IAP 端口：消耗品可重复购买、非消耗品重复购买拒绝、恢复 1 单、台账 3 条。
+            Assert.StartsWith("[Iap]", writer.Lines[4]);
+            Assert.Contains("金币=Purchased", writer.Lines[4]);
+            Assert.Contains("重复购买=AlreadyOwned", writer.Lines[4]);
+            Assert.Contains("恢复=1", writer.Lines[4]);
+            Assert.Contains("台账=3", writer.Lines[4]);
+
+            // 第 6 行：正常接受、重复指纹拒绝、离谱分数拒绝；被拒的不登记，所以台账只有 1 条。
+            Assert.StartsWith("[Validate]", writer.Lines[5]);
+            Assert.Contains("正常=Accepted", writer.Lines[5]);
+            Assert.Contains("分=1200", writer.Lines[5]);
+            Assert.Contains("重复=Rejected(duplicate)", writer.Lines[5]);
+            Assert.Contains("离谱分数=Rejected(score exceeds plausible maximum)", writer.Lines[5]);
+            Assert.Contains("已登记=1/256", writer.Lines[5]);
         }
 
         [Fact]

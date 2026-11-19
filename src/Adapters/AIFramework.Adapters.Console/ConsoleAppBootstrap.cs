@@ -7,7 +7,9 @@ using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
+using AIFramework.Features.Achievement;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Gacha;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
 using AIFramework.Kernel.Realtime;
@@ -75,6 +77,7 @@ namespace AIFramework.Adapters.Console
             _time.SetUtcNow(new DateTime(2026, 11, 18, 9, 0, 0, DateTimeKind.Utc));
 
             WireInventory();
+            WireAchievement();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
 
             _writer.WriteLine("今天天序号=" + signIn.TodayDayIndex + "，初始道具=" + DescribeInventory());
@@ -296,6 +299,86 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>成就切片接线：注册处理器 + 把"已发生的事实"翻译成计数命令。</summary>
+        private void WireAchievement()
+        {
+            var achievements = new AchievementHandler(_bus, _tables);
+            achievements.Register(_bus);
+
+            // 适配层做桥：切片之间不允许互相引用（AIF001），所以"签到/抽卡/战斗/金币"这些事实
+            // 必须由装配层翻译成 AchievementRecordCommand。
+            _bus.Subscribe(new SignInAchievementBridge(_bus));
+            _bus.Subscribe(new GachaAchievementBridge(_bus));
+            _bus.Subscribe(new BattleAchievementBridge(_bus));
+            _bus.Subscribe(new GoldAchievementBridge(_bus));
+        }
+
+        private sealed class SignInAchievementBridge : IEventHandler<DailySignInClaimedEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public SignInAchievementBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in DailySignInClaimedEvent evt)
+            {
+                _bus.Send(new AchievementRecordCommand(AchievementMetrics.SignIn, 1));
+            }
+        }
+
+        private sealed class GachaAchievementBridge : IEventHandler<GachaDrawnEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public GachaAchievementBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in GachaDrawnEvent evt)
+            {
+                _bus.Send(new AchievementRecordCommand(AchievementMetrics.Gacha, 1));
+            }
+        }
+
+        private sealed class BattleAchievementBridge : IEventHandler<GameFinishedEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public BattleAchievementBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in GameFinishedEvent evt)
+            {
+                if (evt.IsVictory)
+                {
+                    _bus.Send(new AchievementRecordCommand(AchievementMetrics.Clear, 1));
+                }
+            }
+        }
+
+        private sealed class GoldAchievementBridge : IEventHandler<ItemGrantedEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public GoldAchievementBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in ItemGrantedEvent evt)
+            {
+                if (evt.ItemId == MetaItemIds.Gold)
+                {
+                    _bus.Send(new AchievementRecordCommand(AchievementMetrics.Gold, evt.Count));
+                }
+            }
+        }
+
         private void RunStorageSmoke(SignInHandler signIn)
         {
             string directory = Path.Combine(

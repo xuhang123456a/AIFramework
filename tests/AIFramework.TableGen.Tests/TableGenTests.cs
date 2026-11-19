@@ -552,14 +552,14 @@ namespace AIFramework.TableGen.Tests
     public sealed class RepoTablesTests
     {
         [Fact]
-        public void AllRepoTables_ExportToTwelveTables()
+        public void AllRepoTables_ExportToThirteenTables()
         {
             string repoRoot = FindRepoRoot();
             IReadOnlyList<SchemaExport> exports = TableExporter.ExportDirectory(Path.Combine(repoRoot, "tables"));
 
-            Assert.Equal(12, exports.Count);
-            Assert.Equal("TbBuilding", exports[0].TableName);
-            Assert.Equal("TbTycoonBuilding", exports[11].TableName);
+            Assert.Equal(13, exports.Count);
+            Assert.Equal("TbAchievement", exports[0].TableName);
+            Assert.Equal("TbTycoonBuilding", exports[12].TableName);
         }
 
         [Fact]

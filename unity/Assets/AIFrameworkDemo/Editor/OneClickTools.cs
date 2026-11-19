@@ -15,7 +15,7 @@ namespace AIFramework.Demo.Editor
     /// 串成一次点击，并把结果汇总成一段可复制的纯文本报告。
     /// <para>
     /// <b>为什么要有它</b>：场景全部由脚本生成，一次完整验收要依次点四个菜单
-    /// （<c>生成全部场景</c> → <c>校验场景装配</c> → <c>把场景加入 Build Settings</c> → 手工确认 12 张表）。
+    /// （<c>生成全部场景</c> → <c>校验场景装配</c> → <c>把场景加入 Build Settings</c> → 手工确认 13 张表）。
     /// 顺序错一步或漏看一眼，现象都是"按 Play 没反应 / 跳转失败"，而且只有真机才看得见。
     /// 这里用一次点击固定顺序执行，并保证<b>单步失败不中断后续收集</b>——
     /// 生成炸了也照样把 Build Settings 与 StreamingAssets 的问题一次性列全，免得修一个跑一次。
@@ -52,7 +52,7 @@ namespace AIFramework.Demo.Editor
         private const int MaxDialogFailureLines = 6;
 
         /// <summary>
-        /// 12 张配置表文件名，与 <c>unity/Assets/StreamingAssets/AIFrameworkDemo</c> 下的实际文件一一对应。
+        /// 13 张配置表文件名，与 <c>unity/Assets/StreamingAssets/AIFrameworkDemo</c> 下的实际文件一一对应。
         /// <para>
         /// <b>为什么写死名字而不是扫目录</b>：这个检查的目的是"该有的都在"，
         /// 扫目录只能回答"有多少张"，回答不了"缺的是哪一张"；缺表和空表正是这里要抓的现象。
@@ -71,7 +71,8 @@ namespace AIFramework.Demo.Editor
             "TbShopItem.bin",
             "TbSignInReward.bin",
             "TbTower.bin",
-            "TbTycoonBuilding.bin"
+            "TbTycoonBuilding.bin",
+            "TbAchievement.bin"
         };
 
         /// <summary>
@@ -130,7 +131,7 @@ namespace AIFramework.Demo.Editor
         }
 
         /// <summary>
-        /// 只跑第 4 步：检查 StreamingAssets 下的 12 张表，<b>打印每张表的字节数</b>
+        /// 只跑第 4 步：检查 StreamingAssets 下的 13 张表，<b>打印每张表的字节数</b>
         /// （空表在二进制层面和缺表一样致命，字节数是最直接的证据）。
         /// </summary>
         [MenuItem("AIFramework/工具/检查 StreamingAssets 表", priority = 43)]
@@ -290,7 +291,7 @@ namespace AIFramework.Demo.Editor
         }
 
         /// <summary>
-        /// 第 4 步：检查 StreamingAssets 下 12 张 <c>.bin</c> 是否存在且非空。
+        /// 第 4 步：检查 StreamingAssets 下 13 张 <c>.bin</c> 是否存在且非空。
         /// </summary>
         /// <param name="report">汇总容器（只追加，不抛出）。</param>
         /// <param name="logEachTable">是否逐张打印字节数（单项菜单要，全量一键校验时只在报告里给区间）。</param>

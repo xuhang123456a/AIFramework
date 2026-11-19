@@ -14,6 +14,7 @@ using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
 using AIFramework.Core.Save;
 using AIFramework.Core.Ui;
+using AIFramework.Features.Achievement;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Localization;
@@ -90,6 +91,8 @@ namespace AIFramework.Adapters.Unity
 
         private readonly UnityVfxService _vfx;
 
+        private readonly UnityIapService _iap;
+
         /// <summary>内核工厂；宿主通过它 <c>Begin</c> 会话，再用 <see cref="UnityKernelFactory.LastRealtime"/> 拿战局引用。</summary>
         private readonly UnityKernelFactory _factory;
 
@@ -109,6 +112,29 @@ namespace AIFramework.Adapters.Unity
 
         /// <summary>任务切片；子表缺失时为 <c>null</c>。</summary>
         private QuestHandler? _quests;
+
+        private AchievementHandler? _achievements;
+
+        /// <summary>成就切片是否装配成功（表缺失时降级为 false，不影响启动）。</summary>
+        public bool AchievementAvailable
+        {
+            get { return _achievements != null; }
+        }
+
+        /// <summary>成就查询入口；未装配时抛 <see cref="InvalidOperationException"/>（契约错误要响，不静默）。</summary>
+        public AchievementHandler Achievements
+        {
+            get
+            {
+                AchievementHandler? current = _achievements;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("成就切片尚未装配成功（TbAchievement.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
+        }
 
         /// <summary>邮件切片；子表缺失时为 <c>null</c>。</summary>
         private MailHandler? _mails;
@@ -165,6 +191,7 @@ namespace AIFramework.Adapters.Unity
             _assets = new UnityAssetLoader();
             _spatial = new UnitySpatialQuery(spatialBufferCapacity, spatialLayerMask);
             _vfx = new UnityVfxService(_logger);
+            _iap = new UnityIapService(storage: _storage, storeId: "purchases");
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
 
             // 工厂要拿表加载器组卡牌，所以它必须在表加载器之后构造。
@@ -246,6 +273,12 @@ namespace AIFramework.Adapters.Unity
         public UnityVfxService Vfx
         {
             get { return _vfx; }
+        }
+
+        /// <summary>IAP 端口（当前是"本地假商店"：购买记录落盘，无真实商店）；无存储后端时 IsAvailable=false。</summary>
+        public UnityIapService Iap
+        {
+            get { return _iap; }
         }
 
         public UnitySpatialQuery Spatial
@@ -419,7 +452,25 @@ namespace AIFramework.Adapters.Unity
                 }
             }
 
-            if (_mails == null)
+            // 成就：与 Quest/Mail 同样的"表缺失就降级"策略——外围系统不该拖垮整局启动。
+        if (_achievements == null)
+        {
+            try
+            {
+                var achievements = new AchievementHandler(_bus, _tableLoader);
+                achievements.Register(_bus);
+                _achievements = achievements;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _achievements = null;
+                _logger.Error("成就切片装配失败（TbAchievement.bin 缺失或损坏），已跳过：" + exception.Message);
+            }
+        }
+        if (_mails == null)
             {
                 try
                 {
