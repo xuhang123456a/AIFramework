@@ -90,6 +90,9 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, CardBattleScenePath);
             AddIfSceneExists(scenes, Match3ScenePath);
             AddIfSceneExists(scenes, TowerDefenseScenePath);
+            AddIfSceneExists(scenes, ArenaScenePath);
+            AddIfSceneExists(scenes, IdleScenePath);
+            AddIfSceneExists(scenes, GachaScenePath);
 
             if (scenes.Count == 0)
             {
@@ -141,6 +144,15 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>塔防场景路径（与 <c>TowerDefenseSceneBuilder</c> 保持一致）。</summary>
         private const string TowerDefenseScenePath = "Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity";
+
+        /// <summary>竞技场场景路径。</summary>
+        private const string ArenaScenePath = "Assets/AIFrameworkDemo/Scenes/ArenaScene.unity";
+
+        /// <summary>放置经营场景路径。</summary>
+        private const string IdleScenePath = "Assets/AIFrameworkDemo/Scenes/IdleScene.unity";
+
+        /// <summary>抽卡场景路径。</summary>
+        private const string GachaScenePath = "Assets/AIFrameworkDemo/Scenes/GachaScene.unity";
 
         private static void AddIfSceneExists(List<EditorBuildSettingsScene> scenes, string assetPath)
         {

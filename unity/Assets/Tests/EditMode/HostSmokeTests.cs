@@ -247,7 +247,10 @@ namespace AIFramework.Tests.EditMode
             "Assets/AIFrameworkDemo/Scenes/LobbyScene.unity",
             "Assets/AIFrameworkDemo/Scenes/CardBattleScene.unity",
             "Assets/AIFrameworkDemo/Scenes/Match3Scene.unity",
-            "Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity"
+            "Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/ArenaScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/IdleScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/GachaScene.unity"
         };
 
         [Test]

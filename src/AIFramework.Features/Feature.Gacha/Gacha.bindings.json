@@ -1,0 +1,27 @@
+{
+  "panel": "Gacha",
+  "viewNamespace": "AIFramework.Features.Gacha",
+  "summary": "抽卡面板视图接口：只负责展示金币与最近结果，并把单抽/十连点击抛给 Presenter。",
+  "bindings": [
+    {
+      "kind": "Event",
+      "name": "DrawOnceClicked",
+      "summary": "点击单抽按钮。"
+    },
+    {
+      "kind": "Event",
+      "name": "DrawTenClicked",
+      "summary": "点击十连按钮。"
+    },
+    {
+      "kind": "Number",
+      "name": "Gold",
+      "summary": "金币数量。"
+    },
+    {
+      "kind": "Text",
+      "name": "LastResult",
+      "summary": "最近一次抽卡结果文本（由 Presenter 拼好）。"
+    }
+  ]
+}

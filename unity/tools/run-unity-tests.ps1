@@ -51,7 +51,7 @@ function Sync-Sources {
     )
 
     foreach ($pair in $pairs) {
-        $args = @((Join-Path $repoRoot $pair.Src), $pair.Dst, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
+        $args = @((Join-Path $repoRoot $pair.Src), $pair.Dst, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
         if ($pair.Exclude.Count -gt 0) {
             $args += '/XD'
             $args += $pair.Exclude

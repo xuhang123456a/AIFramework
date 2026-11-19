@@ -52,6 +52,9 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/CardBattleScene.unity", typeof(CardBattleController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/Match3Scene.unity", typeof(Match3Controller), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity", typeof(TowerDefenseController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/ArenaScene.unity", typeof(ArenaController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/IdleScene.unity", typeof(IdlePanelController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/GachaScene.unity", typeof(GachaPanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 

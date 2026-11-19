@@ -51,7 +51,7 @@ function Sync-Sources {
 
     foreach ($pair in $pairs) {
         $srcPath = Join-Path $repoRoot $pair.Src
-        $args = @($srcPath, $pair.Dst, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
+        $args = @($srcPath, $pair.Dst, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
         if ($pair.Exclude.Count -gt 0) {
             $args += '/XD'
             $args += $pair.Exclude
@@ -71,7 +71,7 @@ if (-not (Test-Path $workProject)) {
     New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
 
     $exclude = @('Library', 'Logs', 'Temp', 'UserSettings', '.git', '.github', 'obj', 'bin', 'artifacts')
-    & robocopy $repoRoot $WorkDir /E /XD @exclude /XJ /NFL /NDL /NJH /NJS /NP | Out-Null
+    & robocopy $repoRoot $WorkDir /MIR /XD @exclude /XJ /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) {
         throw "复制仓库失败（robocopy 退出码 $LASTEXITCODE）"
     }

@@ -1,0 +1,29 @@
+{
+  "panel": "Idle",
+  "viewNamespace": "AIFramework.Features.IdleTycoon",
+  "summary": "放置面板视图接口：只负责展示金币/收入/建筑列表，并把升级点击抛给 Presenter。",
+  "bindings": [
+    {
+      "kind": "EventWithInt",
+      "name": "UpgradeClicked",
+      "parameter": "buildingId",
+      "summary": "点击某栋建筑的升级按钮（回传 buildingId）。"
+    },
+    {
+      "kind": "Number",
+      "name": "Gold",
+      "summary": "金币数量。"
+    },
+    {
+      "kind": "Text",
+      "name": "Income",
+      "summary": "当前每秒收入文本（由 Presenter 拼好，视图不再做数值格式化）。"
+    },
+    {
+      "kind": "List",
+      "name": "Buildings",
+      "itemType": "BuildingViewData",
+      "summary": "建筑列表（每栋的等级/上限/升级费用/产出/可升级标记）。"
+    }
+  ]
+}

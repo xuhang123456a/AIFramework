@@ -149,6 +149,9 @@ namespace UnityEditor
         /// <summary>字符串值。</summary>
         public string stringValue { get; set; } = string.Empty;
 
+        /// <summary>浮点值（建场景脚本给 <c>fixedStepSeconds</c> 这类 float 字段赋值时用）。</summary>
+        public float floatValue { get; set; }
+
         /// <summary>数组长度（桩：可读写）。</summary>
         public int arraySize { get; set; }
 

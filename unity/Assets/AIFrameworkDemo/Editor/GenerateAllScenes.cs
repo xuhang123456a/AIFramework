@@ -29,6 +29,9 @@ namespace AIFramework.Demo.Editor
             CardBattleSceneBuilder.CreateCardBattleScene();
             Match3SceneBuilder.CreateMatch3Scene();
             TowerDefenseSceneBuilder.CreateTowerDefenseScene();
+            ArenaSceneBuilder.CreateArenaScene();
+            IdleSceneBuilder.CreateIdleScene();
+            GachaSceneBuilder.CreateGachaScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），
