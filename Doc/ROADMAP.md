@@ -60,7 +60,7 @@
 | T3-5 | 通用 UI 框架 | 弹窗栈/安全区/层级/Toast/Loading | [x] 弹窗栈 + SafeAreaFitter + CanvasSortOrder + Toast/Loading（见 T3-15） |
 | T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [x] Core 17 例 + ArenaScene 逐帧指纹回放（PlayMode） |
 | T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [x] NetworkContracts + MatchValidationLedger 13 例（HTTP 未接线） |
-| T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [~] 包 v9.1.0 已装 + 安装器自检通过（`Library/HybridCLR`，工程级可逆）；**热更程序集切分 / AOT 元数据 / IL2CPP 出包 / 真机加载**未做 |
+| T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [~] 包 v9.1.0 + 安装器自检 + 热更程序集 + `hotUpdateAssemblies` + link.xml/Il2CppDef 生成已通；**阻塞：本机 Editor 未装 IL2CPP 模块且无 Unity Hub**，`AIFW_IL2CPP=1` 出包报 `IL2CPP is not installed`（解除步骤见 Doc/07） |
 | T3-9 | 本地化 | 文案表 + 语言切换 + 回退 | [x] 切片 33 例 + 2 套夹具表 + LobbyScene 切语言（真机） |
 | T3-10 | 音频/特效端口 | IAudioPort / IVfxService + 适配实现 | [x] 音频 32 例 + 特效 19 例 + 双端实现 + 宿主接线 |
 | T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [x] FrameProfiler/PerformanceHud + PlayMode 采样 + 回合内核 0 分配门禁 + Realtime Unity 内 600 帧 ≤1KB 门禁 |

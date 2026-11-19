@@ -162,3 +162,36 @@
 结论：**"包安装 + 热更程序集切分 + hotUpdateAssemblies 配置"已可复跑**；
 `link.xml` / `AOTGenericReferences.cs` / 方法桥需要以"先 IL2CPP 出包一次"为前提，
 因此下一步是 IL2CPP 出包（`AIFW_IL2CPP=1` 走 `BuildPlayer.BuildWindows`），再回到 GenerateAll。
+### 当前唯一阻塞点（实测，2026-11-20）
+
+`AIFW_IL2CPP=1` 出包直接失败：
+
+```
+[Build] scriptingBackend=IL2CPP
+[Build] 开始出包 → .../Build/Windows-IL2CPP/AIFramework.exe（场景数 23）
+Error building Player: Currently selected scripting backend (IL2CPP) is not installed.
+```
+
+根因与判定依据：
+- 该 Editor（`6000.3.21f1`）只装了 `WindowsStandaloneSupport`（Mono 后端），**没有装 IL2CPP 支持模块**；
+- 本机**没有 Unity Hub**（`C:\Program Files\Unity Hub` 是空目录，`Unity Hub.exe` 全盘找不到），
+  所以无法用 Hub CLI 补装模块；
+- 这是与我方代码无关的**环境前置缺失**，不是配置错误：`GenerateAll` 里 `GenerateStripedAOTDlls`
+  同样依赖该模块产出的 `Il2CppOutputProject`。
+
+已能独立跑通、不依赖 IL2CPP 的部分（本轮实测）：
+```
+[G] ok HybridCLR.Commands.LinkGeneratorCommand.GenerateLinkXml
+[G] ok HybridCLR.Commands.Il2CppDefGeneratorCommand.GenerateIl2CppDef
+→ 产出 Assets/HybridCLR/Generate/link.xml
+```
+
+解除阻塞的最小步骤（需要用户侧动作，约 1.5~2 GB 下载）：
+1. 安装 Unity Hub（或直接下载 `Windows IL2CPP Support` 模块安装包）：
+   `Unity Hub -- --headless install-modules --version 6000.3.21f1 -m windows-il2cpp`
+2. `AIFramework/HybridCLR/安装并自检` → `AIFramework/HybridCLR/配置热更程序集并生成元数据`
+3. `AIFW_IL2CPP=1` 出包 → 再跑 `GenerateAll`（此时 `GenerateStripedAOTDlls` 才会成功）
+4. 验证热更：替换 `Build/Windows-IL2CPP/AIFramework_Data/StreamingAssets/HotUpdate/*.dll.bytes` 后启动，
+   确认 `HotUpdateInfo.Version` 变化且旧包可回滚。
+
+在这 4 步完成前，T3-8 保持 `[~]`，其余条目已全部 `[x]`。

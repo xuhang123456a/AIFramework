@@ -110,8 +110,24 @@ if (-not (Test-Path $resultsPath)) {
     throw "等待测试结果超时。日志：$logPath"
 }
 
-[xml]$results = Get-Content -LiteralPath $resultsPath -Raw
-$run = $results.'test-run'
+[xml]$results = $null
+$run = $null
+# 结果文件在 Unity 退出瞬间可能还没写完（或还停在旧内容），解析失败时给两次重试机会。
+for ($attempt = 0; $attempt -lt 3; $attempt++) {
+    try {
+        [xml]$candidate = Get-Content -LiteralPath $resultsPath -Raw
+        if ($null -ne $candidate.'test-run') {
+            $results = $candidate
+            $run = $candidate.'test-run'
+            break
+        }
+    } catch {
+        Write-Host ("测试结果文件尚未写完（第 " + ($attempt + 1) + " 次）：" + $_.Exception.Message)
+    }
+
+    Start-Sleep -Seconds 3
+}
+
 if ($null -eq $run) {
     throw "测试结果文件格式异常：$resultsPath"
 }
