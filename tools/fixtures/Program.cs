@@ -39,6 +39,7 @@ namespace AIFramework.Fixtures
                 WriteQuest(target);
                 WriteMail(target);
                 WriteCard(target);
+                WriteTower(target);
                 Console.WriteLine("已生成夹具：" + Path.GetFullPath(target));
             }
 
@@ -139,6 +140,25 @@ namespace AIFramework.Fixtures
                 writer.Write(damage);
                 writer.Write(block);
                 writer.Write(copies);
+            });
+        }
+
+        private static void WriteTower(string directory)
+        {
+            // TbTower: row{towerId, cost, damage, range} —— 16 字节/行（塔防切片的 Feature.TowerDefense 子表）
+            var rows = new List<(int TowerId, int Cost, int Damage, int Range)>
+            {
+                (1, 100, 10, 2),
+                (2, 250, 24, 3)
+            };
+
+            WriteTable(Path.Combine(directory, "TbTower.bin"), rows.Count, (writer, index) =>
+            {
+                (int towerId, int cost, int damage, int range) = rows[index];
+                writer.Write(towerId);
+                writer.Write(cost);
+                writer.Write(damage);
+                writer.Write(range);
             });
         }
 

@@ -1,3 +1,4 @@
+#nullable enable
 using AIFramework.Adapters.Unity.Lobby;
 using UnityEditor;
 using UnityEditor.SceneManagement;

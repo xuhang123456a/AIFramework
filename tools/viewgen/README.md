@@ -72,6 +72,6 @@ dotnet run --project tools/viewgen -- <json> --interface-out <path> --binder-out
 
 ## 五、边界（Phase 1）
 
-- Unity 侧还没有「从场景/预制体收集 `UIBindNode` 并导出 `bindings.json`」的编辑器工具，**描述文件目前手写**（一个面板一份，很小）。
+- Unity 侧已有编辑器导出器菜单 `AIFramework/导出 UI 绑定描述`（`unity/Assets/AIFrameworkDemo/Editor/UIBindExporter.cs`）：从场景里的 `UIBindNode` 语义标记生成 `Assets/AIFrameworkDemo/Bindings/<Panel>.bindings.json`，再拷进切片目录。`List.itemType`、`EventWithInt.parameter` 与 `summary` 无法从控件推断，导出时从同名旧描述继承；详见 `Doc/05_UI绑定导出器.md`。
 - Binder 不引用 UGUI 类型：按钮通过 `RaiseXxx()` 交给 UnityEvent 连线，列表项内容交给 `partial` 钩子——这样生成的代码不绑定具体 UI 框架。
 - 列表池只增不减（`Ensure<Name>Items`），符合「UI 面板生命周期内不抖动分配」的口径。

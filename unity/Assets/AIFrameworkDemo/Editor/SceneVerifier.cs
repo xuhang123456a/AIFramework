@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -50,6 +51,7 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/LobbyScene.unity", typeof(LobbyController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/CardBattleScene.unity", typeof(CardBattleController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/Match3Scene.unity", typeof(Match3Controller), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity", typeof(TowerDefenseController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 

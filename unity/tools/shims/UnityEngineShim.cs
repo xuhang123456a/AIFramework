@@ -222,6 +222,9 @@ namespace UnityEngine
         public static string streamingAssetsPath = string.Empty;
 
         public static string persistentDataPath = string.Empty;
+
+        /// <summary>Assets 目录的绝对路径（桩：空串；真实 Unity 里是 &lt;project&gt;/Assets）。</summary>
+        public static string dataPath = string.Empty;
     }
 
     public enum QueryTriggerInteraction

@@ -1,3 +1,4 @@
+#nullable enable
 using UnityEditor;
 using UnityEngine;
 
@@ -27,6 +28,7 @@ namespace AIFramework.Demo.Editor
             LobbySceneBuilder.CreateLobbyScene();
             CardBattleSceneBuilder.CreateCardBattleScene();
             Match3SceneBuilder.CreateMatch3Scene();
+            TowerDefenseSceneBuilder.CreateTowerDefenseScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），

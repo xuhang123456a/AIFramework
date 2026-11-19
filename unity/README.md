@@ -92,6 +92,16 @@ pwsh unity/tools/generate-scenes.ps1
 
 它把仓库复制到临时目录（保留 `Library` 做增量导入）→ 在副本里跑 `Unity -batchmode -executeMethod AIFramework.Demo.Editor.GenerateAllScenes.Generate` → 把 `*.unity`、`.meta`、`EditorBuildSettings.asset` 拷回仓库。用户当前开着编辑器也能跑（副本不受工程独占锁影响）。
 
+### Unity 侧自动化测试（真机引擎里跑）
+
+```powershell
+pwsh unity/tools/run-unity-tests.ps1            # EditMode，10 例
+pwsh unity/tools/run-unity-tests.ps1 -Filter HostSmokeTests
+```
+
+覆盖纯 .NET 单测覆盖不到的部分：`StreamingAssets` 表加载、Unity 时间/随机/存档端口、Session 端口行为、
+Build Settings 场景顺序。跑在与 `generate-scenes.ps1` 相同的副本工程里，不影响你正在用的编辑器。
+
 > 依赖 `com.unity.ugui`（`UnityEngine.UI` 在独立包里，不在 `com.unity.modules.*`）——缺了它 HUD 在真 Unity 里编不过。已写进 `Packages/manifest.json`。
 
 ## 三、把编译守卫接进 Unity（可选，默认不装）

@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using AIFramework.Adapters.Unity.Scene;
 using UnityEditor;
@@ -88,6 +89,7 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, LobbyScenePath);
             AddIfSceneExists(scenes, CardBattleScenePath);
             AddIfSceneExists(scenes, Match3ScenePath);
+            AddIfSceneExists(scenes, TowerDefenseScenePath);
 
             if (scenes.Count == 0)
             {
@@ -136,6 +138,9 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>三消场景路径（与 <c>Match3SceneBuilder</c> 保持一致）。</summary>
         private const string Match3ScenePath = "Assets/AIFrameworkDemo/Scenes/Match3Scene.unity";
+
+        /// <summary>塔防场景路径（与 <c>TowerDefenseSceneBuilder</c> 保持一致）。</summary>
+        private const string TowerDefenseScenePath = "Assets/AIFrameworkDemo/Scenes/TowerDefenseScene.unity";
 
         private static void AddIfSceneExists(List<EditorBuildSettingsScene> scenes, string assetPath)
         {

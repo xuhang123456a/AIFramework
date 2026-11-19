@@ -28,7 +28,7 @@
 | T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [x] 内核+测试+场景 |
 | T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核+测试+场景 |
 | T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [ ] |
-| T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [ ] |
+| T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [x] 切片 + 控制器 + 场景 |
 | T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [x] 切片 + 测试（场景待接） |
 | T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [x] 切片 + 测试（场景待接） |
 
@@ -36,7 +36,7 @@
 
 | # | 品类 | 依赖 | 证明的能力 | 状态 |
 |---|---|---|---|---|
-| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [~] 排队中 |
+| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [x] 切片 + 50 例（场景待接） |
 | T2-2 | 肉鸽卡牌 | Turn | 随机地图 + 局内构筑 + 种子复现 | [ ] |
 | T2-3 | 自走棋 | Turn | 阵容经济 + 自动战斗推演 | [ ] |
 | T2-4 | 战棋 SRPG | Turn | 网格寻路 + 技能范围仲裁 | [ ] |
@@ -56,7 +56,7 @@
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
 | T3-1 | Luban 真表接入 | 替换 12 字节夹具，schema + 导出 + 加载器 | [ ] |
-| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [~] 生成器侧已完备（Number/--all），导出器待做 |
+| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [x] 组件 + 导出器 + 文档（真机菜单待验） |
 | T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
 | T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [~] 第一版（UnitySceneDirector，同步加载 + 异常兜底） |
 | T3-5 | 通用 UI 框架 | 弹窗栈/Toast/Loading/红点绑定 | [ ] |
@@ -65,7 +65,7 @@
 | T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [ ] |
 | T3-9 | 本地化 | 文案表 + 语言切换 + TMP 回退 | [ ] |
 | T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [ ] |
-| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [ ] |
+| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] Unity EditMode 测试已可跑，性能门禁待加 |
 | T3-12 | 编辑器工具 | 关卡编辑器、技能编辑器、数值表校验 | [ ] |
 | T3-13 | CI/CD | GitHub Actions：build/test/viewgen check/形状校验/出包 | [~] 工作流已落地（.github/workflows/ci.yml），出包待补 |
 | T3-14 | 云存档 | IStoragePort 远端实现 + 冲突策略 | [ ] |
@@ -73,6 +73,12 @@
 ---
 
 ## 轮次日志（每轮追加，最新在上）
+
+### R6 — 2026-11-20
+- 完成：`Feature.Merge`（6×6 合成状态机，50 例）、`Feature.TowerDefense`（Meta 建造切片）、塔防场景（双内核演示）、
+  `UIBindNode`/`UIViewDescriptor`/导出器（T3-2）、**Unity EditMode 测试闭环**（10 例真机跑通）
+- 新增工具：`unity/tools/run-unity-tests.ps1`（离屏跑 EditMode 测试）、manifest 加 `com.unity.test-framework` 1.6.0
+- 场景：6 个场景全部离屏生成 + 装配校验通过，Build Settings 按 Boot→Lobby→CardBattle→Match3→TowerDefense 注册
 
 ### R5 — 2026-11-20
 - 完成：`Feature.IdleTycoon`（离线收益/升级/24h 封顶）、`Feature.Gacha`（权重抽取 + 10 抽保底）、场景装配校验器、离屏场景生成流水线

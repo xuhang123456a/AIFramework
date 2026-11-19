@@ -165,6 +165,9 @@ namespace UnityEditor
         /// <summary>当前选中的对象。</summary>
         public static UnityEngine.Object? activeObject { get; set; }
 
+        /// <summary>当前选中的 GameObject（导出器用它取面板根；桩里可读写，不连编辑器）。</summary>
+        public static GameObject? activeGameObject { get; set; }
+
         /// <summary>当前选中的对象集合。</summary>
         public static UnityEngine.Object[] objects { get; set; } = Array.Empty<UnityEngine.Object>();
     }
