@@ -26,9 +26,22 @@ namespace UnityEngine
 
     public class Component : Object
     {
-        public Transform transform = new Transform();
+        private Transform? _transform;
+        private GameObject? _gameObject;
 
-        public GameObject gameObject = new GameObject();
+        /// <summary>所属 Transform（形状桩）：**懒初始化**。
+        /// 之前写成 `= new Transform()` 会与 <c>Transform : Component</c> 形成构造递归，
+        /// 任何 `new GameObject()` 都会 StackOverflow——离线夹具因此不得不绕路。</summary>
+        public Transform transform
+        {
+            get { return _transform ?? (_transform = new Transform()); }
+        }
+
+        /// <summary>所属 GameObject（形状桩）：懒初始化，避免无参构造的递归。</summary>
+        public GameObject gameObject
+        {
+            get { return _gameObject ?? (_gameObject = new GameObject()); }
+        }
 
         /// <summary>取自身或子节点上的组件（形状桩）。</summary>
         public T GetComponent<T>() where T : Component

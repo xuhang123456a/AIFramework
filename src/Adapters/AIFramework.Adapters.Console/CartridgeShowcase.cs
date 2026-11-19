@@ -5,6 +5,7 @@ using AIFramework.Contracts.Numerics;
 using AIFramework.Contracts.Ports;
 using AIFramework.Kernel.Turn.AutoChess;
 using AIFramework.Kernel.Turn.Puzzle;
+using AIFramework.Kernel.Turn.Rhythm;
 using AIFramework.Kernel.Turn.Tetris;
 
 namespace AIFramework.Adapters.Console
@@ -25,6 +26,7 @@ namespace AIFramework.Adapters.Console
             RunPuzzle(writer);
             RunTetris(writer);
             RunAutoChess(writer);
+            RunRhythm(writer);
         }
 
         private static void RunPuzzle(IIOWriter writer)
@@ -73,6 +75,26 @@ namespace AIFramework.Adapters.Console
             writer.WriteLine("[AutoChess] 回合=" + world.RoundIndex + " 玩家HP=" + world.PlayerHp
                 + " 敌方HP=" + world.EnemyHp + " 战斗已结算=" + world.IsBattleResolved
                 + " 玩家单位=" + world.PlayerUnitCount + " 敌方单位=" + world.EnemyUnitCount);
+        }
+
+        private static void RunRhythm(IIOWriter writer)
+        {
+            var world = new RhythmWorld(new GameplayInitData(levelId: 1, randomSeed: 20261120, unitCount: 0))
+            {
+                AutoPlay = true,
+            };
+
+            // 自动完美演奏：推进到曲尾。步长必须小于 Perfect 窗口（45ms），
+            // 否则自动打点会跨过窗口，变成"漏打判 Miss"（这一点第一次跑就暴露了）。
+            for (int i = 0; i < 2000 && !world.IsFinished; i++)
+            {
+                world.Tick(0.02d);
+            }
+
+            writer.WriteLine("[Rhythm] 曲长=" + world.SongLengthSeconds.ToString("F1") + "s 音符=" + world.NoteCount
+                + " Perfect=" + world.PerfectCount + " Miss=" + world.MissCount
+                + " 最大连击=" + world.MaxCombo + " 准确率=" + world.Accuracy.ToString("P1")
+                + " 结束=" + world.IsFinished);
         }
 
         private static string DescribeLoots(GameplayResult result)
