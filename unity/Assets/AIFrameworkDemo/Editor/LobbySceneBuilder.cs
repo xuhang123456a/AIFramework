@@ -124,6 +124,16 @@ namespace AIFramework.Demo.Editor
             Button closeButton = CreateButton("PopupCloseButton", root, "关掉一个");
             SetHeight(closeButton.gameObject, RowHeight);
 
+            // 本地化演示：文案全部走 ILocalizationQuery，切语言时整条链路重查。
+            Text languageText = CreateLabel("LanguageText", root, "语言：简体中文");
+            SetHeight(languageText.gameObject, LabelHeight);
+            Text playText = CreateLabel("LocalizedPlayText", root, "ui.play → 开始游戏");
+            SetHeight(playText.gameObject, LabelHeight);
+            Text fallbackText = CreateLabel("LocalizedFallbackText", root, "缺 key 回退：ui.missing");
+            SetHeight(fallbackText.gameObject, LabelHeight);
+            Button switchLanguageButton = CreateButton("SwitchLanguageButton", root, "切换语言");
+            SetHeight(switchLanguageButton.gameObject, RowHeight);
+
             // 其余玩法场景统一用 SceneNavigator：不用往 LobbyController 里塞一堆字段，
             // 场景装配校验也会自动检查这些按钮的 targetScene/button 有没有漏注入。
             CreateSceneEntry(root, "ArenaButton", "进入竞技场场景", "ArenaScene");
@@ -154,6 +164,13 @@ namespace AIFramework.Demo.Editor
             SetReference(popupHud, "pushButton", pushButton);
             SetReference(popupHud, "closeButton", closeButton);
             SetReference(controller, "popupHud", popupHud);
+
+            var localizationHud = lobbyGo.AddComponent<AIFramework.Adapters.Unity.Lobby.LocalizationHud>();
+            SetReference(localizationHud, "languageText", languageText);
+            SetReference(localizationHud, "playText", playText);
+            SetReference(localizationHud, "fallbackText", fallbackText);
+            SetReference(localizationHud, "switchButton", switchLanguageButton);
+            SetReference(controller, "localizationHud", localizationHud);
 
             SetReference(signInHud, "grid", signInGrid);
             SetReference(signInHud, "slotTemplate", slotTemplate);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace AIFramework.Fixtures
 {
@@ -42,6 +43,7 @@ namespace AIFramework.Fixtures
                 WriteBuilding(target);
                 WriteGachaPool(target);
                 WriteMergeItem(target);
+                WriteLocalization(target);
                 WriteTower(target);
                 Console.WriteLine("已生成夹具：" + Path.GetFullPath(target));
             }
@@ -223,6 +225,43 @@ namespace AIFramework.Fixtures
                 writer.Write(itemId);
                 writer.Write(sellGold);
             });
+        }
+
+        private static void WriteLocalization(string directory)
+        {
+            // TbLocalization（变长表）：[int32 keyCount] + keyCount × {[int32 keyLen]key UTF8
+            //   + [int32 langCount] + langCount × {[int32 lang][int32 textLen]text UTF8}}
+            var entries = new List<(string Key, int[] Languages, string[] Texts)>
+            {
+                ("ui.play", new[] { 0, 1, 2 }, new[] { "开始游戏", "Play", "ゲーム開始" }),
+                ("ui.signin", new[] { 0, 1, 2 }, new[] { "签到", "Sign In", "ログイン" }),
+                ("ui.shop", new[] { 0, 1 }, new[] { "商店", "Shop" })
+            };
+
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            writer.Write(entries.Count);
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                (string key, int[] languages, string[] texts) = entries[i];
+                byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+                writer.Write(keyBytes.Length);
+                writer.Write(keyBytes);
+
+                writer.Write(languages.Length);
+                for (int j = 0; j < languages.Length; j++)
+                {
+                    byte[] textBytes = Encoding.UTF8.GetBytes(texts[j]);
+                    writer.Write(languages[j]);
+                    writer.Write(textBytes.Length);
+                    writer.Write(textBytes);
+                }
+            }
+
+            writer.Flush();
+            File.WriteAllBytes(Path.Combine(directory, "TbLocalization.bin"), stream.ToArray());
+            Console.WriteLine("  TbLocalization.bin  " + stream.Length + " 字节, " + entries.Count + " 行");
         }
 
         private static void WriteTable(string path, int rowCount, Action<BinaryWriter, int> writeRow)

@@ -74,6 +74,15 @@
 
 ## 轮次日志（每轮追加，最新在上）
 
+### R10 — 2026-11-20（进行中）
+- 完成：弹窗队列接进 Unity UI（宿主新增 `IPopupQueue` 端口）+ PlayMode 优先级出队验收
+- 并行作业：本地化切片（T3-9）、推箱子（T2-10）、俄罗斯方块（T2-9）、自走棋（T2-3）
+
+### R9 — 2026-11-20
+- 战斗场景接入 `RealtimeSceneBinder`（碰撞体 + 每帧 Sync + `Physics.SyncTransforms`）
+- 战棋内核（T2-4）：8×8、BFS 可达、敌方 AI、50 回合平局，30 例
+- PlayMode 场景冒烟：9 个场景真机加载跑帧零错误；补 122 个文件 `#nullable enable`
+
 ### R8 — 2026-11-20
 - `RealtimeSceneBinder`：把布场数据变成已登记碰撞体的场景对象（此前战斗场景"能跑但不打架"）
 - PlayMode 测试层：护盾反射真机验证（ReflectedCount≥1）、飞行物 Transform 同步

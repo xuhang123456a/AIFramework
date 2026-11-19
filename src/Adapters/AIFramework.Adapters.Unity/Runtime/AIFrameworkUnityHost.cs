@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Localization;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Ports;
 using AIFramework.Contracts.Ui;
@@ -14,6 +15,7 @@ using AIFramework.Core.Save;
 using AIFramework.Core.Ui;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Inventory;
+using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
 using AIFramework.Features.Quest;
 using AIFramework.Features.Shop;
@@ -107,6 +109,8 @@ namespace AIFramework.Adapters.Unity
 
         /// <summary>邮件切片；子表缺失时为 <c>null</c>。</summary>
         private MailHandler? _mails;
+
+        private LocalizationHandler? _localization;
 
         /// <summary>大厅存档服务（背包/任务/邮件状态落盘）。</summary>
         private SaveService? _lobbySave;
@@ -422,6 +426,24 @@ namespace AIFramework.Adapters.Unity
                     _logger.Error("邮件切片装配失败（子表缺失或损坏），已跳过：" + exception.Message);
                 }
             }
+
+            if (_localization == null)
+            {
+                try
+                {
+                    var localization = new LocalizationHandler(_bus, _tableLoader);
+                    localization.Register(_bus);
+                    _localization = localization;
+                }
+                catch (Exception exception) when (exception is InvalidOperationException
+                    || exception is InvalidDataException
+                    || exception is IOException
+                    || exception is ArgumentException)
+                {
+                    _localization = null;
+                    _logger.Error("本地化切片装配失败（子表缺失或损坏），已跳过：" + exception.Message);
+                }
+            }
         }
 
         /// <summary>
@@ -513,6 +535,27 @@ namespace AIFramework.Adapters.Unity
         }
 
         /// <summary>邮件是否可用。</summary>
+        /// <summary>本地化切片；<see cref="LocalizationAvailable"/> 为 false 时访问会抛异常。</summary>
+        public LocalizationHandler Localization
+        {
+            get
+            {
+                LocalizationHandler? current = _localization;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("本地化切片未装配（TbLocalization.bin 缺失）。请先跑 tools/fixtures 生成夹具。");
+                }
+
+                return current;
+            }
+        }
+
+        /// <summary>本地化子表是否装配成功。</summary>
+        public bool LocalizationAvailable
+        {
+            get { return _localization != null; }
+        }
+
         public bool MailAvailable
         {
             get { return _mails != null; }

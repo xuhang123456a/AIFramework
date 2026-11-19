@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using AIFramework.Adapters.Unity;
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Localization;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
 using AIFramework.Features.Quest;
 using AIFramework.Features.Shop;
@@ -114,6 +116,32 @@ namespace AIFramework.Tests.EditMode
 
             Assert.Greater(inbox.Mails.Count, 0, "邮件表为空。");
             Assert.AreEqual(MailState.Unread, inbox.Mails[0].State, "首封邮件应是未读状态。");
+        }
+
+        [Test]
+        public void Localization_SwitchesLanguage_AndFallsBackToKey()
+        {
+            using AIFrameworkUnityHost host = CreateHost();
+
+            Assert.IsTrue(host.LocalizationAvailable, "本地化切片缺表：TbLocalization.bin。");
+            Assert.AreEqual(GameLanguage.ChineseSimplified, host.Localization.CurrentLanguage, "默认语言应是简体中文。");
+
+            var play = new LocalizationQueryRequest("ui.play");
+            LocalizedText chinese = host.Bus.Query<LocalizationQueryRequest, LocalizedText>(in play);
+            Assert.IsTrue(chinese.Found, "ui.play 应在夹具表里。");
+            Assert.AreEqual("开始游戏", chinese.Text);
+
+            var switchCommand = new SetLanguageCommand(GameLanguage.English);
+            host.Bus.Send(in switchCommand);
+            Assert.AreEqual(GameLanguage.English, host.Localization.CurrentLanguage);
+
+            LocalizedText english = host.Bus.Query<LocalizationQueryRequest, LocalizedText>(in play);
+            Assert.AreEqual("Play", english.Text, "切到英文后 ui.play 应变英文。");
+
+            var missing = new LocalizationQueryRequest("ui.not-exist");
+            LocalizedText fallback = host.Bus.Query<LocalizationQueryRequest, LocalizedText>(in missing);
+            Assert.IsFalse(fallback.Found, "不存在的 key 应标记 Found=false。");
+            Assert.AreEqual("ui.not-exist", fallback.Text, "缺 key 时文案回退成 key 本身。");
         }
 
         [Test]

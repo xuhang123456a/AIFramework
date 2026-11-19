@@ -55,6 +55,9 @@ namespace AIFramework.Adapters.Unity.Lobby
         [Tooltip("弹窗队列演示（可选）：挂上后可在界面上推三个不同优先级的弹窗并逐个关闭。")]
         [SerializeField] private PopupHud? popupHud = null;
 
+        [Tooltip("本地化演示（可选）：显示当前语言文案并循环切换语言。")]
+        [SerializeField] private LocalizationHud? localizationHud = null;
+
         private AIFrameworkUnityHost? _host;
         private SignInPresenter? _signIn;
         private ShopPresenter? _shop;
@@ -110,6 +113,11 @@ namespace AIFramework.Adapters.Unity.Lobby
             {
                 popupHud.Bind(host.Popups);
             }
+
+            if (localizationHud != null)
+            {
+                localizationHud.Bind(host);
+            }
         }
 
         private void Start()
@@ -138,6 +146,7 @@ namespace AIFramework.Adapters.Unity.Lobby
             }
 
             popupHud = null;
+            localizationHud = null;
 
             _signIn?.Dispose();
             _signIn = null;
