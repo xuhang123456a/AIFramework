@@ -101,6 +101,18 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator RunnerScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<RunnerController>("RunnerScene");
+        }
+
+        [UnityTest]
+        public IEnumerator PlatformerScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<PlatformerController>("PlatformerScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");
