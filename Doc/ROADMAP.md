@@ -23,38 +23,54 @@
 
 | # | 场景 | 品类 | 依赖内核/层 | 关键新能力 | 状态 |
 |---|---|---|---|---|---|
-| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [x] Boot 场景 + SceneDirector（真机待验） |
-| T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片 + Presenter + Unity 装配已完成，缺场景 UI |
-| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [x] 内核+测试+场景 |
-| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核+测试+场景 |
-| T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [x] 场景 + 绑定器（碰撞体接入中） |
-| T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [x] 切片 + 控制器 + 场景 |
-| T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [x] 切片 + 测试（场景待接） |
-| T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [x] 切片 + 测试（场景待接） |
-
+| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [x] BootScene + BootController + UnitySceneDirector；PlayMode 冒烟通过 |
+| T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/本地化/23 场景导航 | [x] LobbyScene（258KB）+ 全部 HUD/Presenter；PlayMode 验证 |
+| T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [x] 内核 + 测试 + CardBattleScene |
+| T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核 + 测试 + Match3Scene |
+| T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [x] ArenaScene + RealtimeSceneBinder + 回放比对 |
+| T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [x] 切片 + TowerDefenseController + 场景 |
+| T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [x] 切片 + IdlePresenter + IdleScene |
+| T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [x] 切片 + GachaPresenter + GachaScene |
 ## T2 · 品类扩展（每项必须证明一个框架能力）
 
 | # | 品类 | 依赖 | 证明的能力 | 状态 |
 |---|---|---|---|---|
-| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [x] 切片 + 50 例（场景待接） |
-| T2-2 | 肉鸽卡牌 | Turn | 随机地图 + 局内构筑 + 种子复现 | [ ] |
-| T2-3 | 自走棋 | Turn | 阵容经济 + 自动战斗推演 | [ ] |
-| T2-4 | 战棋 SRPG | Turn | 网格寻路 + 技能范围仲裁 | [ ] |
-| T2-5 | 弹幕射击 | Realtime | **最硬 0 GC/高实体数** pressure test | [ ] |
-| T2-6 | 跑酷 Runner | Realtime | 输入→位移确定性 | [ ] |
-| T2-7 | 平台跳跃 | Realtime | 物理查询端口可替换（Mock vs PhysX） | [ ] |
-| T2-8 | 棋盘/大富翁 | Turn | 回合事件链 + 随机驱动 | [ ] |
-| T2-9 | 俄罗斯方块类 | Realtime/独立 | 固定步长 + 形态旋转状态机 | [ ] |
-| T2-10 | 解谜（推箱子/数独） | 纯数据 | 零引擎依赖 + 纯逻辑可测 | [ ] |
-| T2-11 | 模拟经营/农场 | Meta | 时间系统 + 离线结算 | [ ] |
-| T2-12 | 挂机 RPG | Meta | 数值曲线 + 离线收益 | [ ] |
-| T2-13 | 音游 | Realtime | 时间精度 + 判定窗口 | [ ] |
-| T2-14 | 异步 PVP | Meta + Realtime | 快照/回放复用 | [ ] |
-
+| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [x] 切片 50 例 + MergeScene |
+| T2-2 | 肉鸽卡牌 | Turn | 随机地图 + 局内构筑 + 种子复现 | [x] RoguelikeWorld 27 例 + RoguelikeScene |
+| T2-3 | 自走棋 | Turn | 阵容经济 + 自动战斗推演 | [x] AutoChessWorld 31 例 + AutoChessScene |
+| T2-4 | 战棋 SRPG | Turn | 网格寻路 + 技能范围仲裁 | [x] TacticsWorld 30 例 + TacticsScene |
+| T2-5 | 弹幕射击 | Realtime | **最硬 0 GC/高实体数** pressure test | [x] BulletHellScene（≈530 弹幕/1200 帧）+ 出界回收 |
+| T2-6 | 跑酷 Runner | Turn（实时感） | 输入→位移确定性 | [x] RunnerWorld 28 例 + RunnerScene |
+| T2-7 | 平台跳跃 | Turn（自实现物理） | 重力/单向平台/收集品 + 子步防穿墙 | [x] PlatformerWorld 38 例 + PlatformerScene |
+| T2-8 | 棋盘棋类 | Turn | 回合棋盘 + 搜索 AI | [x] 黑白棋 BoardGameWorld 29 例 + BoardGameScene（大富翁类未做，可另扩） |
+| T2-9 | 俄罗斯方块类 | Turn | 形态旋转状态机 + 消行计分 | [x] TetrisWorld 37 例 + TetrisScene |
+| T2-10 | 解谜（推箱子） | 纯数据 | 零引擎依赖 + 纯逻辑可测 | [x] PuzzleWorld 25 例 + PuzzleScene |
+| T2-11 | 模拟经营 | Meta | 时间系统 + 建造/升级/员工 | [x] Tycoon 切片 38 例 + TycoonScene |
+| T2-12 | 挂机 RPG | Meta | 数值曲线 + 自动战斗 + 关卡推进 | [x] IdleRpg 切片 40 例 + IdleRpgScene |
+| T2-13 | 音游 | Turn（时间轴） | 时间精度 + 判定窗口 | [x] RhythmWorld 37 例 + RhythmScene |
+| T2-14 | 异步 PVP | Meta + 回放 | 快照/段位/确定性结算 | [x] AsyncPvp 切片 30 例 + AsyncPvpScene |
 ## T3 · 框架深化
 
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
+| T3-1 | 配置表导出器（Luban 替代） | JSON schema + 导出 + 12 表逐字节等价 + `--check` 门禁 | [x] `tools/tablegen` + `tables/*.json` + 29 例；CI 双目标交叉校验 |
+| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [x] 组件 + 导出器 + 文档（真机菜单待人眼验） |
+| T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] v1 包络 + CRC32 已有；**版本迁移未做**（下一轮） |
+| T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [x] UnitySceneDirector + SceneNavigator + BootController；PlayMode 覆盖 |
+| T3-5 | 通用 UI 框架 | 弹窗栈/安全区/层级/Toast/Loading | [~] 弹窗栈 + SafeAreaFitter + CanvasSortOrder 已做；**Toast/Loading 未做** |
+| T3-6 | 确定性回放 | 输入录制 + 同种子重放断言 | [x] Core 17 例 + ArenaScene 逐帧指纹回放（PlayMode） |
+| T3-7 | 网络与服务器校验骨架 | 帧/状态同步端口 + 校验契约 | [x] NetworkContracts + MatchValidationLedger 13 例（HTTP 未接线） |
+| T3-8 | HybridCLR 全链路 | 热更程序集切分 + AOT 元数据 + 真机 | [~] 方案文档（Doc/07）；**未安装**（需动 Packages，待用户在关编辑器时授权） |
+| T3-9 | 本地化 | 文案表 + 语言切换 + 回退 | [x] 切片 33 例 + 2 套夹具表 + LobbyScene 切语言（真机） |
+| T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [~] 音频端口 + 双端实现 32 例已做；**VFX 端口未做** |
+| T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [~] FrameProfiler/PerformanceHud + PlayMode 采样 + 回合内核 0 分配门禁；**Realtime 帧分配门禁未做** |
+| T3-12 | 编辑器工具 | 关卡/场景/数值表校验 | [x] UIBindExporter + OneClickTools（一键校验）+ GenerateAllScenes/SceneVerifier |
+| T3-13 | CI/CD | build/test/viewgen/tablegen/形状校验/出包 | [~] 纯逻辑五道闸门已进 CI；**Unity 出包需 license，只做本地脚本**（已文档化） |
+| T3-14 | 云存档 | 远端实现 + 冲突策略 | [x] 端口 + CloudSaveMerger 34 例 + 双端实现（HTTP 未接线） |
+| T3-15 | Toast/Loading 层 | 轻提示 + 转圈遮罩，接 IPopupQueue 之外的一条通道 | [ ] |
+| T3-16 | VFX 端口 | IVfxService + Unity 粒子池 + Console 记录 | [ ] |
+| T3-17 | 存档版本迁移 | v1→v2 schema 迁移 + 迁移链测试 + 损坏回退 | [ ] |
+---|---|---|---|
 | T3-1 | Luban 真表接入 | 替换 12 字节夹具，schema + 导出 + 加载器 | [ ] |
 | T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [x] 组件 + 导出器 + 文档（真机菜单待验） |
 | T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
