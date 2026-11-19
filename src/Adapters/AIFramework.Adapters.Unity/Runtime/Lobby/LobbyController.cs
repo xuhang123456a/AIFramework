@@ -52,6 +52,9 @@ namespace AIFramework.Adapters.Unity.Lobby
         /// <summary>进入三消场景。</summary>
         [SerializeField] private Button? match3Button = null;
 
+        [Tooltip("弹窗队列演示（可选）：挂上后可在界面上推三个不同优先级的弹窗并逐个关闭。")]
+        [SerializeField] private PopupHud? popupHud = null;
+
         private AIFrameworkUnityHost? _host;
         private SignInPresenter? _signIn;
         private ShopPresenter? _shop;
@@ -102,6 +105,11 @@ namespace AIFramework.Adapters.Unity.Lobby
             {
                 match3Button.onClick.AddListener(GoMatch3);
             }
+
+            if (popupHud != null)
+            {
+                popupHud.Bind(host.Popups);
+            }
         }
 
         private void Start()
@@ -128,6 +136,8 @@ namespace AIFramework.Adapters.Unity.Lobby
             {
                 match3Button.onClick.RemoveListener(GoMatch3);
             }
+
+            popupHud = null;
 
             _signIn?.Dispose();
             _signIn = null;

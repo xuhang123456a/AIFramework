@@ -6,10 +6,12 @@ using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Ports;
+using AIFramework.Contracts.Ui;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
 using AIFramework.Core.Save;
+using AIFramework.Core.Ui;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Mail;
@@ -95,6 +97,8 @@ namespace AIFramework.Adapters.Unity
         /// <summary>红点树（主板底座）：各切片只发增量/设定值指令，不互相引用。</summary>
         private readonly RedDotTree _redDots;
 
+        private readonly PopupQueue _popups;
+
         /// <summary>商店切片；子表缺失时为 <c>null</c>（见 <see cref="ShopAvailable"/>）。</summary>
         private ShopHandler? _shop;
 
@@ -161,6 +165,7 @@ namespace AIFramework.Adapters.Unity
             _bus = new CqeBus();
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
+            _popups = new PopupQueue();
             _signInView = new NullSignInView(_logger);
         }
 
@@ -439,6 +444,12 @@ namespace AIFramework.Adapters.Unity
         }
 
         /// <summary>红点树。</summary>
+        /// <summary>弹窗队列端口（UI 表现层用；业务切片只发"要弹哪个"，不关心栈与动效）。</summary>
+        public IPopupQueue Popups
+        {
+            get { return _popups; }
+        }
+
         public RedDotTree RedDots
         {
             get { return _redDots; }

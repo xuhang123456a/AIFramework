@@ -114,6 +114,16 @@ namespace AIFramework.Demo.Editor
             Button match3Button = CreateButton("Match3Button", root, "进入三消场景");
             SetHeight(match3Button.gameObject, RowHeight);
 
+            // 弹窗队列演示：三个不同优先级的弹窗入队，逐个关闭时按优先级出队（10 号最后）。
+            Text popupStatus = CreateLabel("PopupStatus", root, "弹窗队列：0 个");
+            SetHeight(popupStatus.gameObject, LabelHeight);
+            Text popupTop = CreateLabel("PopupTop", root, "最近关闭：无");
+            SetHeight(popupTop.gameObject, LabelHeight);
+            Button pushButton = CreateButton("PopupPushButton", root, "推三个弹窗");
+            SetHeight(pushButton.gameObject, RowHeight);
+            Button closeButton = CreateButton("PopupCloseButton", root, "关掉一个");
+            SetHeight(closeButton.gameObject, RowHeight);
+
             // 其余玩法场景统一用 SceneNavigator：不用往 LobbyController 里塞一堆字段，
             // 场景装配校验也会自动检查这些按钮的 targetScene/button 有没有漏注入。
             CreateSceneEntry(root, "ArenaButton", "进入竞技场场景", "ArenaScene");
@@ -137,6 +147,13 @@ namespace AIFramework.Demo.Editor
             SetReference(controller, "statusText", status);
             SetReference(controller, "cardBattleButton", cardBattleButton);
             SetReference(controller, "match3Button", match3Button);
+
+            var popupHud = lobbyGo.AddComponent<AIFramework.Adapters.Unity.Lobby.PopupHud>();
+            SetReference(popupHud, "statusText", popupStatus);
+            SetReference(popupHud, "topText", popupTop);
+            SetReference(popupHud, "pushButton", pushButton);
+            SetReference(popupHud, "closeButton", closeButton);
+            SetReference(controller, "popupHud", popupHud);
 
             SetReference(signInHud, "grid", signInGrid);
             SetReference(signInHud, "slotTemplate", slotTemplate);

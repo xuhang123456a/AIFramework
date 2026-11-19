@@ -290,6 +290,16 @@ namespace UnityEngine
         public static void LogException(Exception exception) { }
     }
 
+    /// <summary>Inspector 提示（形状桩）。</summary>
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class TooltipAttribute : Attribute
+    {
+        /// <summary>提示文本。</summary>
+        public TooltipAttribute(string tooltip)
+        {
+        }
+    }
+
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class SerializeField : Attribute
     {
@@ -321,6 +331,7 @@ namespace UnityEngine
         }
     }
 }
+
 
 
 
