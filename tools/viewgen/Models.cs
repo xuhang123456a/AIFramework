@@ -20,6 +20,9 @@ namespace AIFramework.ViewGen
         /// <summary>文本渲染。</summary>
         Text = 3,
 
+        /// <summary>整数渲染（金币/数量这类，避免视图层做 int→string 分配）。</summary>
+        Number = 5,
+
         /// <summary>显隐渲染。</summary>
         Visible = 4
     }

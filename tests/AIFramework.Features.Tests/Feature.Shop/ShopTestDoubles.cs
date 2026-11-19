@@ -174,6 +174,38 @@ namespace AIFramework.Features.Tests.Shop
     }
 
     /// <summary>
+    /// 极简钱包：把 <see cref="ConsumeItemCommand"/> / <see cref="GrantItemCommand"/> 真的结算进
+    /// <see cref="ShopInventoryStub"/>，这样"买完金币真的变少"才可断言（共享 <c>NoOpCommandHandler</c> 只吞指令不落账）。
+    /// <para>
+    /// 它只做账，不做规则：能否购买、扣多少、发什么货全部由 <see cref="ShopHandler"/> 决定。
+    /// </para>
+    /// </summary>
+    public sealed class ShopWalletStub : ICommandHandler<ConsumeItemCommand>, ICommandHandler<GrantItemCommand>
+    {
+        private readonly ShopInventoryStub _inventory;
+
+        public ShopWalletStub(ShopInventoryStub inventory)
+        {
+            if (inventory == null)
+            {
+                throw new ArgumentNullException(nameof(inventory));
+            }
+
+            _inventory = inventory;
+        }
+
+        void ICommandHandler<ConsumeItemCommand>.Handle(in ConsumeItemCommand command)
+        {
+            _inventory.SetCount(command.ItemId, _inventory.GetCount(command.ItemId) - command.Count);
+        }
+
+        void ICommandHandler<GrantItemCommand>.Handle(in GrantItemCommand command)
+        {
+            _inventory.SetCount(command.ItemId, _inventory.GetCount(command.ItemId) + command.Count);
+        }
+    }
+
+    /// <summary>
     /// 商店切片的一次性装配：真实 <see cref="ShopHandler"/> + 真实 <c>CqeBus</c>
     /// （经共享 <see cref="RecordingBus"/> 记录）+ 本切片自带的桩端口。
     /// </summary>
@@ -224,12 +256,37 @@ namespace AIFramework.Features.Tests.Shop
         /// <summary>用指定加载器装配一套夹具（表缺失/畸形场景走这里）。</summary>
         public static ShopTestHarness Create(IBinaryTableLoader loader)
         {
+            return Create(loader, settleWithWallet: false);
+        }
+
+        /// <summary>
+        /// 用指定加载器装配一套"余额会真的变化"的夹具：扣款/发货经 <see cref="ShopWalletStub"/> 落到
+        /// <see cref="Inventory"/> 上，供 Presenter 用例断言购买后的金币。
+        /// </summary>
+        public static ShopTestHarness CreateWithWallet(IBinaryTableLoader loader)
+        {
+            return Create(loader, settleWithWallet: true);
+        }
+
+        private static ShopTestHarness Create(IBinaryTableLoader loader, bool settleWithWallet)
+        {
             RecordingBus bus = new RecordingBus();
             ShopInventoryStub inventory = new ShopInventoryStub();
 
-            // 扣款/发货由背包切片结算，这里只提供槽位，避免真实总线因未注册抛异常。
-            bus.RegisterCommandHandler<ConsumeItemCommand>(new NoOpCommandHandler<ConsumeItemCommand>());
-            bus.RegisterCommandHandler<GrantItemCommand>(new NoOpCommandHandler<GrantItemCommand>());
+            // 扣款/发货由背包切片结算：默认只提供槽位，避免真实总线因未注册抛异常；
+            // 需要余额变动时改由钱包桩落账。
+            if (settleWithWallet)
+            {
+                ShopWalletStub wallet = new ShopWalletStub(inventory);
+                bus.RegisterCommandHandler<ConsumeItemCommand>(wallet);
+                bus.RegisterCommandHandler<GrantItemCommand>(wallet);
+            }
+            else
+            {
+                bus.RegisterCommandHandler<ConsumeItemCommand>(new NoOpCommandHandler<ConsumeItemCommand>());
+                bus.RegisterCommandHandler<GrantItemCommand>(new NoOpCommandHandler<GrantItemCommand>());
+            }
+
             bus.RegisterQueryHandler<InventoryQueryRequest, InventorySnapshot>(inventory);
 
             ShopHandler handler = new ShopHandler(bus, loader);

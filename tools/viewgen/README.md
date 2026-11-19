@@ -47,6 +47,7 @@
 | `EventWithInt` | `event Action<int>? On<Name>;` | `public void Raise<Name>(int param)` |
 | `List` | `void Render<Name>(IReadOnlyList<T> items);` | 池化 `Instantiate` + 显隐；项目侧实现 `partial void OnBind<Name>Item(GameObject, T)` |
 | `Text` | `void Render<Name>(string text);` | 转发 `partial void OnRender<Name>Text(string)` |
+| Number | `void Render<Name>(int value);` | 转发 `partial void OnRender<Name>Number(int)` |
 | `Visible` | `void Render<Name>(bool visible);` | 转发 `partial void OnRender<Name>Visible(bool)` |
 
 `partial void` 是刻意设计：**没实现时编译器会把调用消掉**，所以先跑通逻辑、后补皮肤，不会因为缺皮肤编译不过。
@@ -59,6 +60,9 @@ dotnet run --project tools/viewgen -- src/AIFramework.Features/Feature.DailySign
 
 # 只校验磁盘上的生成物是否与描述一致（CI / 提交前；过期返回码 4）
 dotnet run --project tools/viewgen -- src/AIFramework.Features/Feature.DailySignIn/SignIn.bindings.json --check
+
+# 扫描全仓 *.bindings.json 逐份校验（CI 用这个）
+dotnet run --project tools/viewgen -- --all
 
 # 覆盖输出位置
 dotnet run --project tools/viewgen -- <json> --interface-out <path> --binder-out <path> --binder-namespace <ns>

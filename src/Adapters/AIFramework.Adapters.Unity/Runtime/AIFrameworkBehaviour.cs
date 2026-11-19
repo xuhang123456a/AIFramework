@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using AIFramework.Contracts.Gameplay;
+using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Kernel.Realtime;
@@ -73,6 +74,9 @@ namespace AIFramework.Adapters.Unity
 
         /// <summary>当前实时战局布场入口（Contracts 接口，不依赖内核具体类型）；回合制会话时为 <c>null</c>。</summary>
         private IRealtimeSandbox? _activeSandbox;
+
+        /// <summary>当前场次 ID：结算时随 <c>GameFinishedEvent</c> 一起广播，任务/活动切片据此区分关卡。</summary>
+        private int _activeLevelId;
 
         /// <summary>
         /// 固定步长（秒）。<b>为什么要累加器</b>：<c>BattleWorld.Step</c> 按秒推进，若直接把可变的
@@ -259,6 +263,7 @@ namespace AIFramework.Adapters.Unity
         /// <returns>是否成功创建实时战局。</returns>
         public bool BeginRealtime(int levelId, int randomSeed, int unitCount)
         {
+            _activeLevelId = levelId;
             AIFrameworkUnityHost? host = _host;
             if (!_ready || host == null)
             {
@@ -457,6 +462,16 @@ namespace AIFramework.Adapters.Unity
             }
 
             GameplayResult result = host.Sessions.EndAndCollect();
+
+            // 一局结束是"事实"，广播给任务/活动/成就类切片；它们不需要知道这是哪个内核。
+            host.PublishGameFinished(GameplayKernelType.Realtime, _activeLevelId, result.IsVictory);
+
+            IReadOnlyList<LootItem> loots = result.Loots;
+            for (int i = 0; i < loots.Count; i++)
+            {
+                LootItem loot = loots[i];
+                host.Bus.Send(new GrantItemCommand(loot.ItemId, loot.Count, MetaReasonTags.GameLoot));
+            }
 
             IRealtimeSandbox? sandbox = _activeSandbox;
             int reflected = sandbox != null ? sandbox.ReflectedCount : 0;

@@ -1,0 +1,24 @@
+{
+  "panel": "Shop",
+  "viewNamespace": "AIFramework.Features.Shop",
+  "summary": "商店面板视图接口：只负责展示与把点击抛给 Presenter。",
+  "bindings": [
+    {
+      "kind": "EventWithInt",
+      "name": "BuyClicked",
+      "parameter": "itemId",
+      "summary": "点击购买（按钮上带商品 ID 参数）。"
+    },
+    {
+      "kind": "Number",
+      "name": "Gold",
+      "summary": "金币数量。"
+    },
+    {
+      "kind": "List",
+      "name": "Items",
+      "itemType": "ShopItemViewData",
+      "summary": "商品列表。"
+    }
+  ]
+}

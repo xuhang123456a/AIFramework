@@ -239,14 +239,15 @@ namespace AIFramework.Core.Tests.Meta
         }
 
         [Fact]
-        public void Register_AddsExactlyOneCommandAndOneQueryHandler()
+        public void Register_AddsTwoCommandAndOneQueryHandler()
         {
             CqeBus bus = new CqeBus();
             RedDotTree tree = new RedDotTree();
 
             tree.Register(bus);
 
-            Assert.Equal(1, bus.RegisteredCommandHandlerCount);
+            // 两条命令：RedDotDeltaCommand（增量）+ RedDotSetCommand（重登重算的绝对值）
+            Assert.Equal(2, bus.RegisteredCommandHandlerCount);
             Assert.Equal(1, bus.RegisteredQueryHandlerCount);
             Assert.Equal(0, bus.SubscriberCount);
         }
@@ -267,7 +268,9 @@ namespace AIFramework.Core.Tests.Meta
             tree.Register(bus);
 
             Assert.Throws<InvalidOperationException>(() => tree.Register(bus));
-            Assert.Equal(1, bus.RegisteredCommandHandlerCount);
+
+            // 重复注册失败后总线状态不变：仍是 2 条命令（增量 + 设值）+ 1 条查询
+            Assert.Equal(2, bus.RegisteredCommandHandlerCount);
             Assert.Equal(1, bus.RegisteredQueryHandlerCount);
         }
 

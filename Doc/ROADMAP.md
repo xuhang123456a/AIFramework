@@ -23,8 +23,8 @@
 
 | # | 场景 | 品类 | 依赖内核/层 | 关键新能力 | 状态 |
 |---|---|---|---|---|---|
-| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [ ] |
-| T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片并行开发中（Inventory/Shop/Quest/Mail/RedDot/Popup） |
+| T1-1 | `Boot` | 启动/装配/加载 | Bootstrap | 装配入口、场景切换、存档加载、日志导出 | [ ] 存档服务已就绪（Core.Save） |
+| T1-2 | `Lobby` | 大厅/主城 | Core + Features | 背包/商店/任务/邮件/红点/弹窗队列/签到/活动入口 | [~] 切片 + Presenter + Unity 装配已完成，缺场景 UI |
 | T1-3 | `CardBattle` | 回合卡牌 | Kernel.Turn（通用化） | 抽牌/能量/出牌/回合状态机/结算 | [ ] |
 | T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [ ] |
 | T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [ ] |
@@ -56,7 +56,7 @@
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
 | T3-1 | Luban 真表接入 | 替换 12 字节夹具，schema + 导出 + 加载器 | [ ] |
-| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [ ] |
+| T3-2 | `UIBindNode` 导出器 | Prefab/场景 → bindings.json，闭合 viewgen 前置 | [~] 生成器侧已完备（Number/--all），导出器待做 |
 | T3-3 | 存档服务 + 版本迁移 | IStoragePort 之上的一层，含 CRC/版本 | [~] 包络+CRC 已实现（SaveService），迁移策略待补 |
 | T3-4 | 场景框架 SceneDirector | 加载/卸载/内核会话生命周期 | [ ] |
 | T3-5 | 通用 UI 框架 | 弹窗栈/Toast/Loading/红点绑定 | [ ] |
@@ -67,12 +67,23 @@
 | T3-10 | 音频/特效端口 | IAudioPort / IVfxPort + 适配实现 | [ ] |
 | T3-11 | 性能与内存基线 | Profiler 采样 + 0 GC 回归门禁 | [ ] |
 | T3-12 | 编辑器工具 | 关卡编辑器、技能编辑器、数值表校验 | [ ] |
-| T3-13 | CI/CD | GitHub Actions：build/test/viewgen check/形状校验/出包 | [ ] |
+| T3-13 | CI/CD | GitHub Actions：build/test/viewgen check/形状校验/出包 | [~] 工作流已落地（.github/workflows/ci.yml），出包待补 |
 | T3-14 | 云存档 | IStoragePort 远端实现 + 冲突策略 | [ ] |
 
 ---
 
 ## 轮次日志（每轮追加，最新在上）
+
+### R2 — 2026-11-20
+- 目标：兑现切片提的 Contracts 缺口；三个面板 Presenter + 视图契约 + 绑定描述；Unity 大厅装配
+- 完成：
+  - 契约：`RedDotSetCommand`（重登重算）、`InventoryListQueryRequest/Snapshot`（背包整包）、`MetaReasonTags` 集中化（5001/5002/6001/6101/6102/6201/6301）
+  - Core/Inventory 相应处理器与测试；`RedDotTree` 注册 2 命令 + 1 查询，`InventoryHandler` 2 命令 + 2 查询
+  - Presenter：`ShopPresenter`/`QuestPresenter`/`MailPresenter` + 各自视图契约与 `*.bindings.json`；视图接口改由 viewgen 统一生成（4 个面板一致）
+  - viewgen：新增 `Number` 绑定类型（金币用 int，避免视图层转字符串）、`--all` 全仓校验；CI 改用 `--all`
+  - Unity：`AIFrameworkUnityHost` 接入真实背包/红点/商店/任务/邮件/存档；`PublishGameFinished` + 战利品入账；删除适配层占位背包
+- 验证：321 例全绿（Core 109 / Features 129 / Adapters 38 / ViewGen 18 / Arch 27）、形状校验通过、`--all` 无漂移
+- 下轮：UIBindNode 导出器（T3-2）+ Lobby 场景 + Boot/SceneDirector（T1-1）
 
 ### R1 — 2026-11-20
 - 基线：`ce7e756`（Unity meta 清零）

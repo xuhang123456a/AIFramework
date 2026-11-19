@@ -258,6 +258,9 @@ namespace AIFramework.ViewGen
                 case BindingKind.Text:
                     return "void Render" + binding.Name + "(string text);";
 
+                case BindingKind.Number:
+                    return "void Render" + binding.Name + "(int value);";
+
                 case BindingKind.Visible:
                     return "void Render" + binding.Name + "(bool visible);";
 
@@ -345,6 +348,16 @@ namespace AIFramework.ViewGen
                     sb.Append("        }\n\n");
                     sb.Append("        /// <summary>文本渲染钩子，项目侧 partial 实现。</summary>\n");
                     sb.Append("        partial void OnRender").Append(binding.Name).Append("Text(string text);\n");
+                    break;
+
+                case BindingKind.Number:
+                    sb.Append("        /// <inheritdoc />\n");
+                    sb.Append("        public void Render").Append(binding.Name).Append("(int value)\n");
+                    sb.Append("        {\n");
+                    sb.Append("            OnRender").Append(binding.Name).Append("Number(value);\n");
+                    sb.Append("        }\n\n");
+                    sb.Append("        /// <summary>整数渲染钩子，项目侧 partial 实现。</summary>\n");
+                    sb.Append("        partial void OnRender").Append(binding.Name).Append("Number(int value);\n");
                     break;
 
                 case BindingKind.Visible:

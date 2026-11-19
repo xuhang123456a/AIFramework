@@ -50,6 +50,11 @@ namespace AIFramework.ViewGen
 
         private static int Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--all")
+            {
+                return CheckAllBindings();
+            }
+
             if (args.Length == 0 || args[0] == "-h" || args[0] == "--help")
             {
                 PrintUsage();
@@ -171,6 +176,82 @@ namespace AIFramework.ViewGen
             return 0;
         }
 
+        /// <summary>
+        /// 扫描整个仓库的 <c>*.bindings.json</c> 并逐份校验磁盘生成物（CI / 提交前用）。
+        /// 返回 0 表示全部一致，4 表示有漂移，2 表示环境问题。
+        /// </summary>
+        private static int CheckAllBindings()
+        {
+            string? repoRoot = RepoLayout.FindRoot(Directory.GetCurrentDirectory());
+            if (repoRoot == null)
+            {
+                Console.Error.WriteLine("--all 需要在仓库内运行（找不到 AIFramework.Pure.sln）。");
+                return 2;
+            }
+
+            string[] specs = Directory.GetFiles(
+                Path.Combine(repoRoot, "src"), "*.bindings.json", SearchOption.AllDirectories);
+            Array.Sort(specs, StringComparer.OrdinalIgnoreCase);
+
+            if (specs.Length == 0)
+            {
+                Console.Error.WriteLine("没有找到任何 *.bindings.json，检查扫描路径。");
+                return 2;
+            }
+
+            int staleTotal = 0;
+            for (int i = 0; i < specs.Length; i++)
+            {
+                string specPath = specs[i];
+                string sourceForHeader = RepoLayout.ToRepoRelative(repoRoot, specPath);
+                PanelSpec spec;
+                try
+                {
+                    spec = BindingSpecReader.Parse(File.ReadAllText(specPath));
+                }
+                catch (ViewGenException ex)
+                {
+                    Console.Error.WriteLine("绑定描述不合法：" + sourceForHeader + " → " + ex.Message);
+                    staleTotal++;
+                    continue;
+                }
+
+                var options = new ViewGenOptions
+                {
+                    InterfacePath = Path.Combine(
+                        Path.GetDirectoryName(specPath) ?? ".", "I" + spec.Panel + "View.g.cs"),
+                    BinderPath = Path.Combine(
+                        repoRoot, "src", "Adapters", "AIFramework.Adapters.Unity", "Runtime", "Views",
+                        spec.BinderName + ".g.cs"),
+                    BinderNamespace = DefaultBinderNamespace,
+                    SourcePath = sourceForHeader
+                };
+
+                IReadOnlyList<string> stale = ViewCodeGenerator.FindStale(spec, options);
+                if (stale.Count == 0)
+                {
+                    Console.WriteLine("OK   " + sourceForHeader);
+                    continue;
+                }
+
+                staleTotal++;
+                Console.Error.WriteLine("过期 " + sourceForHeader + "：");
+                for (int k = 0; k < stale.Count; k++)
+                {
+                    Console.Error.WriteLine("  - " + stale[k]);
+                }
+            }
+
+            if (staleTotal == 0)
+            {
+                Console.WriteLine("全部 " + specs.Length + " 份绑定描述与生成物一致。");
+                return 0;
+            }
+
+            Console.Error.WriteLine("共 " + staleTotal + " 份需要重新生成（禁止手改 .g.cs）。");
+            return 4;
+        }
+
         private static string BuildDefaultBinderPath(string? repoRoot, string jsonDirectory, PanelSpec spec)
         {
             if (repoRoot == null)
@@ -197,6 +278,7 @@ namespace AIFramework.ViewGen
             Console.WriteLine("  --binder-out <path>        Binder 输出路径（默认：Adapter 包 Runtime/Views/<Panel>ViewBinder.g.cs）");
             Console.WriteLine("  --binder-namespace <ns>    Binder 命名空间（默认：" + DefaultBinderNamespace + "）");
             Console.WriteLine("  --check                    只校验磁盘生成物是否与描述一致（CI 用，过期返回 4）");
+            Console.WriteLine("  --all                      扫描仓库内全部 *.bindings.json 逐份校验（无需传描述路径）");
         }
     }
 }

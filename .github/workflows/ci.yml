@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pure-dotnet:
+    name: 纯逻辑闸门（build / test / 生成物 / 适配层形状）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 还原依赖
+        run: dotnet restore AIFramework.Pure.sln
+
+      - name: 构建（0 警告 0 错误是硬性要求）
+        run: dotnet build AIFramework.Pure.sln --no-restore -v m
+
+      - name: 单元测试 + 架构守卫
+        run: dotnet test AIFramework.Pure.sln --no-build -v m
+
+      - name: 生成物一致性（.g.cs 禁止手改，全仓扫描）
+        run: dotnet run --project tools/viewgen/ViewGen.csproj --no-build -- --all
+
+      - name: Unity 适配层形状级编译校验（无需 Unity）
+        run: pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
+
+      - name: 指令表夹具必须与生成器输出一致
+        run: |
+          dotnet run --project tools/fixtures/Fixtures.csproj --no-build -- --out artifacts/fixtures-check
+          git diff --exit-code --stat

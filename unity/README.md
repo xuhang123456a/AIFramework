@@ -44,6 +44,22 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 
 演示场景目前用的是无头 `NullSignInView`（只往 Console 打格子状态），因为 Phase 1 还没做「从 `UIBindNode` 导出 bindings.json」的编辑器工具。
 
+## 二之三、大厅（Meta 切片）在 Unity 里怎么用
+
+`AIFrameworkUnityHost` 已经装好整条大厅链路，场景脚本只需要取用：
+
+| 成员 | 用途 |
+|---|---|
+| `host.Inventory` | 真实背包账本（`GetCount` / `Snapshot` / `Seed`） |
+| `host.RedDots` | 红点树（切片发 `RedDotDeltaCommand` / `RedDotSetCommand`，UI 查 `RedDotQueryRequest`） |
+| `host.Shop` / `ShopAvailable` | 商店（子表 `TbShopItem.bin` 缺失时自动降级，不牵连其它切片） |
+| `host.Quests` / `QuestAvailable` | 任务（`TbQuest.bin`） |
+| `host.Mails` / `MailAvailable` | 邮件（`TbMail.bin`） |
+| `host.LobbySave` | 大厅存档服务（`SaveService`，CRC 包络） |
+| `host.PublishGameFinished(kernel, levelId, isVictory)` | 把一局结果广播给任务/活动切片（`AIFrameworkBehaviour` 结算时已自动调用并结算战利品） |
+
+四个面板（签到 / 商店 / 任务 / 邮件）的视图契约与绑定皮肤都由 `tools/viewgen` 生成：`I<Panel>View.g.cs`（纯逻辑侧）+ `<Panel>ViewBinder.g.cs`（`Runtime/Views/`）。改 UI 先改 `*.bindings.json` 再重新生成，Presenter 与测试不动。
+
 ## 三、把编译守卫接进 Unity（可选，默认不装）
 
 纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。

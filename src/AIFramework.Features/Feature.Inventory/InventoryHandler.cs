@@ -21,7 +21,8 @@ namespace AIFramework.Features.Inventory
     public sealed class InventoryHandler
         : ICommandHandler<GrantItemCommand>,
           ICommandHandler<ConsumeItemCommand>,
-          IQueryHandler<InventoryQueryRequest, InventorySnapshot>
+          IQueryHandler<InventoryQueryRequest, InventorySnapshot>,
+          IQueryHandler<InventoryListQueryRequest, InventoryListSnapshot>
     {
         /// <summary>空账本快照的共享实例：高频轮询时避免反复分配零长度数组。</summary>
         private static readonly InventoryEntry[] EmptyEntries = Array.Empty<InventoryEntry>();
@@ -52,6 +53,7 @@ namespace AIFramework.Features.Inventory
             bus.RegisterCommandHandler<GrantItemCommand>(this);
             bus.RegisterCommandHandler<ConsumeItemCommand>(this);
             bus.RegisterQueryHandler<InventoryQueryRequest, InventorySnapshot>(this);
+            bus.RegisterQueryHandler<InventoryListQueryRequest, InventoryListSnapshot>(this);
             _bus = bus;
         }
 
@@ -107,6 +109,21 @@ namespace AIFramework.Features.Inventory
         public InventorySnapshot Handle(in InventoryQueryRequest query)
         {
             return new InventorySnapshot(query.ItemId, GetCount(query.ItemId));
+        }
+
+        /// <summary>整包查询：背包 UI 一次拿全，按 ItemId 升序。</summary>
+        /// <param name="query">空请求体。</param>
+        /// <returns>整包快照（无道具时返回空数组）。</returns>
+        public InventoryListSnapshot Handle(in InventoryListQueryRequest query)
+        {
+            IReadOnlyList<InventoryEntry> entries = Snapshot();
+            var items = new InventoryEntrySnapshot[entries.Count];
+            for (int i = 0; i < entries.Count; i++)
+            {
+                items[i] = new InventoryEntrySnapshot(entries[i].ItemId, entries[i].Count);
+            }
+
+            return new InventoryListSnapshot(items);
         }
 
         /// <summary>取某道具的持有数量；未持有或 ID 非法一律返回 0。</summary>

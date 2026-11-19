@@ -3,11 +3,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AIFramework.Contracts.Cqe;
+using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Ports;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
+using AIFramework.Core.Meta;
+using AIFramework.Core.Save;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Inventory;
+using AIFramework.Features.Mail;
+using AIFramework.Features.Quest;
+using AIFramework.Features.Shop;
 
 namespace AIFramework.Adapters.Unity
 {
@@ -82,8 +89,23 @@ namespace AIFramework.Adapters.Unity
         /// <summary>玩法会话宿主（主板）。</summary>
         private readonly GameplaySessionHost _sessions;
 
-        /// <summary>Phase 1 的背包占位实现，见文件底部 <see cref="UnityInMemoryInventory"/> 的说明。</summary>
-        private readonly UnityInMemoryInventory _inventory;
+        /// <summary>背包切片（真实业务账本，已替换 Phase 1 的适配层占位实现）。</summary>
+        private readonly InventoryHandler _inventory;
+
+        /// <summary>红点树（主板底座）：各切片只发增量/设定值指令，不互相引用。</summary>
+        private readonly RedDotTree _redDots;
+
+        /// <summary>商店切片；子表缺失时为 <c>null</c>（见 <see cref="ShopAvailable"/>）。</summary>
+        private ShopHandler? _shop;
+
+        /// <summary>任务切片；子表缺失时为 <c>null</c>。</summary>
+        private QuestHandler? _quests;
+
+        /// <summary>邮件切片；子表缺失时为 <c>null</c>。</summary>
+        private MailHandler? _mails;
+
+        /// <summary>大厅存档服务（背包/任务/邮件状态落盘）。</summary>
+        private SaveService? _lobbySave;
 
         /// <summary>签到视图：无头实现，只把格子数量打进日志并留一份最近快照。</summary>
         private readonly NullSignInView _signInView;
@@ -134,7 +156,8 @@ namespace AIFramework.Adapters.Unity
             _factory = new UnityKernelFactory(_spatial, UnityKernelFactory.CreateDefaultPhases());
             _sessions = new GameplaySessionHost(_factory);
             _bus = new CqeBus();
-            _inventory = new UnityInMemoryInventory();
+            _inventory = new InventoryHandler();
+            _redDots = new RedDotTree();
             _signInView = new NullSignInView(_logger);
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
         }
@@ -275,6 +298,7 @@ namespace AIFramework.Adapters.Unity
             }
 
             WireInventory();
+            TryWireMeta();
             TryWireSignIn();
 
             _causalLog.Record(_tagRegistry.Register(InitTagName), _sourceTagId, CausalOutcome.Success);
@@ -320,12 +344,171 @@ namespace AIFramework.Adapters.Unity
                 return;
             }
 
-            _bus.RegisterCommandHandler<GrantItemCommand>(_inventory);
-            _bus.RegisterCommandHandler<ConsumeItemCommand>(_inventory);
-            _bus.RegisterQueryHandler<InventoryQueryRequest, InventorySnapshot>(
-                new UnityInventoryQueryHandler(_inventory));
+            _inventory.Register(_bus);
+            _redDots.Register(_bus);
+
+            // 演示用初始金币：正式项目应由存档/服务器下发，这里只保证"挂上就能点商店"。
+            _inventory.Seed(MetaItemIds.Gold, 1000);
 
             _busWired = true;
+        }
+
+        /// <summary>
+        /// 装配大厅 Meta 切片（商店 / 任务 / 邮件）。任一切片因缺表失败只关掉它自己，
+        /// 不牵连总线与其它切片——缺数据是部署问题，不该让整个场景停摆。
+        /// </summary>
+        private void TryWireMeta()
+        {
+            _lobbySave = new SaveService(_storage, "lobby");
+
+            if (_shop == null)
+            {
+                try
+                {
+                    var shop = new ShopHandler(_bus, _tableLoader);
+                    shop.Register(_bus);
+                    _shop = shop;
+                }
+                catch (Exception exception) when (exception is InvalidOperationException
+                    || exception is InvalidDataException
+                    || exception is IOException
+                    || exception is ArgumentException)
+                {
+                    _shop = null;
+                    _logger.Error("商店切片装配失败（子表缺失或损坏），已跳过：" + exception.Message);
+                }
+            }
+
+            if (_quests == null)
+            {
+                try
+                {
+                    var quests = new QuestHandler(_bus, _tableLoader);
+                    quests.Register(_bus);
+                    _quests = quests;
+                }
+                catch (Exception exception) when (exception is InvalidOperationException
+                    || exception is InvalidDataException
+                    || exception is IOException
+                    || exception is ArgumentException)
+                {
+                    _quests = null;
+                    _logger.Error("任务切片装配失败（子表缺失或损坏），已跳过：" + exception.Message);
+                }
+            }
+
+            if (_mails == null)
+            {
+                try
+                {
+                    var mails = new MailHandler(_bus, _time, _tableLoader);
+                    mails.Register(_bus);
+                    mails.SeedRedDot(_bus);
+                    _mails = mails;
+                }
+                catch (Exception exception) when (exception is InvalidOperationException
+                    || exception is InvalidDataException
+                    || exception is IOException
+                    || exception is ArgumentException)
+                {
+                    _mails = null;
+                    _logger.Error("邮件切片装配失败（子表缺失或损坏），已跳过：" + exception.Message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 把一局结果翻成 <see cref="GameFinishedEvent"/> 广播出去：任务/活动/成就类切片只依赖这个事实，
+        /// 不需要知道打的是哪个内核、更不需要引用内核类型。
+        /// </summary>
+        /// <param name="kernelType">产生结果的玩法内核。</param>
+        /// <param name="levelId">关卡/场次 ID。</param>
+        /// <param name="isVictory">是否胜利。</param>
+        public void PublishGameFinished(GameplayKernelType kernelType, int levelId, bool isVictory)
+        {
+            var finished = new GameFinishedEvent(kernelType, levelId, isVictory);
+            _bus.Publish(in finished);
+        }
+
+        /// <summary>背包切片处理器（真实账本）。</summary>
+        public InventoryHandler Inventory
+        {
+            get { return _inventory; }
+        }
+
+        /// <summary>红点树。</summary>
+        public RedDotTree RedDots
+        {
+            get { return _redDots; }
+        }
+
+        /// <summary>商店切片；<see cref="ShopAvailable"/> 为 false 时访问会抛异常。</summary>
+        public ShopHandler Shop
+        {
+            get
+            {
+                ShopHandler? current = _shop;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("商店切片尚未装配成功（子表缺失？）。");
+                }
+
+                return current;
+            }
+        }
+
+        /// <summary>商店是否可用。</summary>
+        public bool ShopAvailable
+        {
+            get { return _shop != null; }
+        }
+
+        /// <summary>任务切片；<see cref="QuestAvailable"/> 为 false 时访问会抛异常。</summary>
+        public QuestHandler Quests
+        {
+            get
+            {
+                QuestHandler? current = _quests;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("任务切片尚未装配成功（子表缺失？）。");
+                }
+
+                return current;
+            }
+        }
+
+        /// <summary>任务是否可用。</summary>
+        public bool QuestAvailable
+        {
+            get { return _quests != null; }
+        }
+
+        /// <summary>邮件切片；<see cref="MailAvailable"/> 为 false 时访问会抛异常。</summary>
+        public MailHandler Mails
+        {
+            get
+            {
+                MailHandler? current = _mails;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("邮件切片尚未装配成功（子表缺失？）。");
+                }
+
+                return current;
+            }
+        }
+
+        /// <summary>邮件是否可用。</summary>
+        public bool MailAvailable
+        {
+            get { return _mails != null; }
+        }
+
+        /// <summary>大厅存档服务；未 Initialize 前为 null。</summary>
+        public SaveService? LobbySave
+        {
+            get { return _lobbySave; }
         }
 
         /// <summary>
@@ -490,69 +673,4 @@ namespace AIFramework.Adapters.Unity
         }
     }
 
-    /// <summary>
-    /// Phase 1 的内存背包占位实现。<b>为什么在适配层</b>：独立背包切片还没落地，
-    /// 而签到切片必然要发 <c>GrantItemCommand</c> / <c>ConsumeItemCommand</c> 并查补签卡数量；
-    /// 等背包切片实现后，本类整体删除，改由切片自己的处理器接管，签到切片一行都不用改。
-    /// 只做记账，不做上限/校验，因为它不是业务代码。
-    /// </summary>
-    internal sealed class UnityInMemoryInventory
-        : ICommandHandler<GrantItemCommand>,
-          ICommandHandler<ConsumeItemCommand>
-    {
-        /// <summary>道具 ID → 数量。</summary>
-        private readonly Dictionary<int, int> _counts = new Dictionary<int, int>();
-
-        /// <inheritdoc />
-        public void Handle(in GrantItemCommand command)
-        {
-            int current;
-            _counts.TryGetValue(command.ItemId, out current);
-            _counts[command.ItemId] = current + command.Count;
-        }
-
-        /// <inheritdoc />
-        public void Handle(in ConsumeItemCommand command)
-        {
-            int current;
-            _counts.TryGetValue(command.ItemId, out current);
-            int next = current - command.Count;
-            _counts[command.ItemId] = next < 0 ? 0 : next;
-        }
-
-        /// <summary>读当前持有数量；没有记录按 0。</summary>
-        /// <param name="itemId">道具 ID。</param>
-        /// <returns>数量。</returns>
-        public int GetCount(int itemId)
-        {
-            int current;
-            return _counts.TryGetValue(itemId, out current) ? current : 0;
-        }
-    }
-
-    /// <summary>背包只读查询的处理器：把内存账本包成 <c>InventorySnapshot</c>。</summary>
-    internal sealed class UnityInventoryQueryHandler : IQueryHandler<InventoryQueryRequest, InventorySnapshot>
-    {
-        /// <summary>被查询的账本。</summary>
-        private readonly UnityInMemoryInventory _inventory;
-
-        /// <summary>注入账本。</summary>
-        /// <param name="inventory">内存背包。</param>
-        /// <exception cref="ArgumentNullException"><paramref name="inventory"/> 为 <c>null</c>。</exception>
-        public UnityInventoryQueryHandler(UnityInMemoryInventory inventory)
-        {
-            if (inventory == null)
-            {
-                throw new ArgumentNullException(nameof(inventory));
-            }
-
-            _inventory = inventory;
-        }
-
-        /// <inheritdoc />
-        public InventorySnapshot Handle(in InventoryQueryRequest query)
-        {
-            return new InventorySnapshot(query.ItemId, _inventory.GetCount(query.ItemId));
-        }
-    }
 }

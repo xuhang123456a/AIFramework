@@ -225,9 +225,9 @@ namespace AIFramework.Features.Tests.Inventory
 
             handler.Register(bus);
 
-            // 2 条命令 + 1 条查询，全部落在真实总线上。
+            // 2 条命令 + 2 条查询（单个 + 整包），全部落在真实总线上。
             Assert.Equal(2, bus.RegisteredCommandHandlerCount);
-            Assert.Equal(1, bus.RegisteredQueryHandlerCount);
+            Assert.Equal(2, bus.RegisteredQueryHandlerCount);
 
             bus.Send(new GrantItemCommand(Gold, 4, ReasonTagId));
             bus.Send(new ConsumeItemCommand(Gold, 1, ReasonTagId));

@@ -1,0 +1,19 @@
+{
+  "panel": "Quest",
+  "viewNamespace": "AIFramework.Features.Quest",
+  "summary": "任务面板视图接口：只负责展示与把领取点击抛给 Presenter。",
+  "bindings": [
+    {
+      "kind": "EventWithInt",
+      "name": "ClaimClicked",
+      "parameter": "questId",
+      "summary": "点击领取（参数为任务 ID）。"
+    },
+    {
+      "kind": "List",
+      "name": "Quests",
+      "itemType": "QuestItemViewData",
+      "summary": "任务列表。"
+    }
+  ]
+}

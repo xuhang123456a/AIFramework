@@ -1,0 +1,25 @@
+{
+  "panel": "Mail",
+  "viewNamespace": "AIFramework.Features.Mail",
+  "summary": "邮件面板视图接口：只负责展示与把领取/删除抛给 Presenter。",
+  "bindings": [
+    {
+      "kind": "EventWithInt",
+      "name": "ClaimClicked",
+      "parameter": "mailId",
+      "summary": "点击领取（参数为邮件 ID）。"
+    },
+    {
+      "kind": "EventWithInt",
+      "name": "DeleteClicked",
+      "parameter": "mailId",
+      "summary": "点击删除（参数为邮件 ID）。"
+    },
+    {
+      "kind": "List",
+      "name": "Mails",
+      "itemType": "MailItemViewData",
+      "summary": "邮件列表（不含已过期）。"
+    }
+  ]
+}

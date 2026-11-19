@@ -266,34 +266,46 @@ namespace AIFramework.ViewGen.Tests
     /// </summary>
     public sealed class RepoGeneratedCodeTests
     {
-        private const string BindingSpecRelativePath = "src/AIFramework.Features/Feature.DailySignIn/SignIn.bindings.json";
-
         [Fact]
-        public void SignInBindings_GeneratedCodeIsUpToDate()
+        public void AllBindings_GeneratedCodeIsUpToDate()
         {
             string repoRoot = FindRepoRoot();
-            string specPath = Path.Combine(repoRoot, BindingSpecRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            string featuresRoot = Path.Combine(repoRoot, "src");
 
-            Assert.True(File.Exists(specPath), "找不到绑定描述：" + specPath);
+            string[] specs = Directory.GetFiles(featuresRoot, "*.bindings.json", SearchOption.AllDirectories);
+            Assert.True(specs.Length > 0, "仓库里没有任何 *.bindings.json，扫描路径失效。");
 
-            PanelSpec spec = BindingSpecReader.Parse(File.ReadAllText(specPath));
+            Array.Sort(specs, StringComparer.OrdinalIgnoreCase);
 
-            var options = new ViewGenOptions
+            var problems = new List<string>();
+            for (int i = 0; i < specs.Length; i++)
             {
-                InterfacePath = Path.Combine(
-                    repoRoot, "src", "AIFramework.Features", "Feature.DailySignIn", "I" + spec.Panel + "View.g.cs"),
-                BinderPath = Path.Combine(
-                    repoRoot, "src", "Adapters", "AIFramework.Adapters.Unity", "Runtime", "Views", spec.BinderName + ".g.cs"),
-                BinderNamespace = "AIFramework.Adapters.Unity.Views",
-                SourcePath = BindingSpecRelativePath
-            };
+                string specPath = specs[i];
+                string relative = Path.GetRelativePath(repoRoot, specPath).Replace('\\', '/');
+                PanelSpec spec = BindingSpecReader.Parse(File.ReadAllText(specPath));
 
-            IReadOnlyList<string> stale = ViewCodeGenerator.FindStale(spec, options);
+                var options = new ViewGenOptions
+                {
+                    InterfacePath = Path.Combine(
+                        Path.GetDirectoryName(specPath) ?? ".", "I" + spec.Panel + "View.g.cs"),
+                    BinderPath = Path.Combine(
+                        repoRoot, "src", "Adapters", "AIFramework.Adapters.Unity", "Runtime", "Views",
+                        spec.BinderName + ".g.cs"),
+                    BinderNamespace = "AIFramework.Adapters.Unity.Views",
+                    SourcePath = relative
+                };
+
+                IReadOnlyList<string> stale = ViewCodeGenerator.FindStale(spec, options);
+                for (int k = 0; k < stale.Count; k++)
+                {
+                    problems.Add(relative + " → " + stale[k]);
+                }
+            }
 
             Assert.True(
-                stale.Count == 0,
-                "生成物与描述不一致，请执行 dotnet run --project tools/viewgen -- " + BindingSpecRelativePath
-                + Environment.NewLine + "过期文件：" + string.Join(", ", stale));
+                problems.Count == 0,
+                "生成物与描述不一致（禁止手改 .g.cs），执行 dotnet run --project tools/viewgen -- --all 重新生成："
+                + Environment.NewLine + string.Join(Environment.NewLine, problems));
         }
 
         private static string FindRepoRoot([CallerFilePath] string callerFilePath = "")

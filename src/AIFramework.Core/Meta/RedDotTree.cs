@@ -22,6 +22,7 @@ namespace AIFramework.Core.Meta
     /// </summary>
     public sealed class RedDotTree
         : ICommandHandler<RedDotDeltaCommand>,
+      ICommandHandler<RedDotSetCommand>,
           IQueryHandler<RedDotQueryRequest, RedDotSnapshot>
     {
         /// <summary>
@@ -65,6 +66,7 @@ namespace AIFramework.Core.Meta
             }
 
             bus.RegisterCommandHandler<RedDotDeltaCommand>(this);
+            bus.RegisterCommandHandler<RedDotSetCommand>(this);
             bus.RegisterQueryHandler<RedDotQueryRequest, RedDotSnapshot>(this);
         }
 
@@ -77,6 +79,13 @@ namespace AIFramework.Core.Meta
         public void Handle(in RedDotDeltaCommand command)
         {
             Add(command.NodeId, command.Delta);
+        }
+
+        /// <summary>绝对设值指令：重登/重连后重算红点用，与增量互不影响。</summary>
+        /// <param name="command">设值请求。</param>
+        public void Handle(in RedDotSetCommand command)
+        {
+            Set(command.NodeId, command.Value);
         }
 
         /// <inheritdoc />
