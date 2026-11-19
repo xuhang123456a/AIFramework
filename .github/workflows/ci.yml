@@ -30,6 +30,9 @@ jobs:
       - name: 生成物一致性（.g.cs 禁止手改，全仓扫描）
         run: dotnet run --project tools/viewgen/ViewGen.csproj --no-build -- --all
 
+      - name: 配置表 JSON 与已导出 .bin 一致（改 JSON 忘导出即失败）
+        run: dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --check
+
       - name: Unity 适配层形状级编译校验（无需 Unity）
         run: pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 

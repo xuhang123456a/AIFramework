@@ -1,0 +1,38 @@
+{
+  "table": "TbLocalization",
+  "types": {
+    "LocalizationEntry": [
+      { "name": "lang", "type": "int32" },
+      { "name": "text", "type": "string" }
+    ]
+  },
+  "columns": [
+    { "name": "key", "type": "string" },
+    { "name": "entries", "type": "LocalizationEntry[]" }
+  ],
+  "rows": [
+    {
+      "key": "ui.play",
+      "entries": [
+        { "lang": 0, "text": "开始游戏" },
+        { "lang": 1, "text": "Play" },
+        { "lang": 2, "text": "ゲーム開始" }
+      ]
+    },
+    {
+      "key": "ui.signin",
+      "entries": [
+        { "lang": 0, "text": "签到" },
+        { "lang": 1, "text": "Sign In" },
+        { "lang": 2, "text": "ログイン" }
+      ]
+    },
+    {
+      "key": "ui.shop",
+      "entries": [
+        { "lang": 0, "text": "商店" },
+        { "lang": 1, "text": "Shop" }
+      ]
+    }
+  ]
+}

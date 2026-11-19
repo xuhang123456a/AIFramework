@@ -15,4 +15,13 @@
     <ProjectReference Include="..\..\src\Adapters\AIFramework.Adapters.Console\AIFramework.Adapters.Console.csproj" />
   </ItemGroup>
 
+  <!--
+    Unity 适配器没有 .csproj（它由 Unity 的 asmdef 编译），所以纯逻辑的 SafeAreaMath 没法用 ProjectReference 引用。
+    这里以"源码链接"方式（不是复制文件）把同一份 SafeAreaMath.cs 编进测试程序集，
+    保证 dotnet test 跑的就是 Unity 侧真用的那份实现，避免两份公式漂移。
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Adapters\AIFramework.Adapters.Unity\Runtime\UI\SafeAreaMath.cs" Link="Ui\SafeAreaMath.cs" />
+  </ItemGroup>
+
 </Project>

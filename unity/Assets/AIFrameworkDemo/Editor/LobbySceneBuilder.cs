@@ -1,5 +1,6 @@
 #nullable enable
 using AIFramework.Adapters.Unity.Lobby;
+using AIFramework.Adapters.Unity.Ui;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -40,7 +41,24 @@ namespace AIFramework.Demo.Editor
             EnsureEventSystem();
 
             Canvas canvas = CreateCanvas();
-            RectTransform root = CreateContainer("LobbyRoot", canvas.transform);
+
+            // 层级：Canvas 排进 HUD(200) 层。layer 字段默认就是 UiLayerKind.Hud，这里不用再注入。
+            // 其余 19 个场景接入 CanvasSortOrder 是机械改动（每个场景一行），本任务只验大厅，留给后续。
+            canvas.gameObject.AddComponent<CanvasSortOrder>();
+
+            // 安全区：层级从 "Canvas → LobbyRoot → 控件" 变成 "Canvas → SafeArea → LobbyRoot → 控件"。
+            // SafeArea 先四向锚定铺满，运行时由 SafeAreaFitter 按 Screen.safeArea 把四条边收进来，
+            // 刘海/挖孔/底部手势条只会压缩内容可用区，不会把控件顶到刘海底下。
+            RectTransform safeArea = CreateContainer("SafeArea", canvas.transform);
+            safeArea.anchorMin = Vector2.zero;
+            safeArea.anchorMax = Vector2.one;
+            safeArea.offsetMin = Vector2.zero;
+            safeArea.offsetMax = Vector2.zero;
+            safeArea.gameObject.AddComponent<SafeAreaFitter>();
+
+            // 原根容器整体挂到 SafeArea 下：它自己的 0.05..0.95 相对锚点语义不变，只是参照物从
+            // Canvas 变成安全区；控件引用的仍是控件本身，SceneVerifier 的字段校验不受影响。
+            RectTransform root = CreateContainer("LobbyRoot", safeArea);
             root.anchorMin = new Vector2(0.05f, 0.02f);
             root.anchorMax = new Vector2(0.95f, 0.98f);
             root.offsetMin = Vector2.zero;

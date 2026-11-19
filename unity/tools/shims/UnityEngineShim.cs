@@ -135,6 +135,21 @@ namespace UnityEngine
         public void SetParent(Transform parent, bool worldPositionStays)
         {
         }
+
+        /// <summary>
+        /// 子节点数量（<b>追加桩</b>，T3-5 层级递归用）：<c>CanvasSortOrder</c> 要遍历子节点找嵌套 Canvas。
+        /// 桩恒为 0（没有层级概念），因此离线校验只能证明"递归写对了类型"，真机上是否按层递增仍需 PlayMode 验收。
+        /// </summary>
+        public int childCount
+        {
+            get { return 0; }
+        }
+
+        /// <summary>取第 index 个子节点（<b>追加桩</b>，配合 <see cref="childCount"/>；桩恒返回 null）。</summary>
+        public Transform GetChild(int index)
+        {
+            return null!;
+        }
     }
 
     public class Collider : Component
