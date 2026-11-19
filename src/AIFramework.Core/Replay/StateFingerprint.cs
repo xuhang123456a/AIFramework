@@ -59,43 +59,46 @@ namespace AIFramework.Core.Replay
                 throw new ArgumentNullException(nameof(projectiles));
             }
 
-            ulong hash = FnvOffsetBasis;
-
-            Fold(ref hash, UnitSectionMarker);
-            Fold(ref hash, (ulong)units.Count);
-            for (int i = 0; i < units.Count; i++)
+            unchecked
             {
-                UnitReadView unit = units[i];
-                Fold(ref hash, UnitItemMarker);
-                Fold(ref hash, (ulong)(long)unit.Handle.Index);
-                Fold(ref hash, (ulong)(long)unit.Handle.Generation);
-                Fold(ref hash, (ulong)Quantize(unit.Position.X));
-                Fold(ref hash, (ulong)Quantize(unit.Position.Y));
-                Fold(ref hash, (ulong)Quantize(unit.Radius));
-                Fold(ref hash, (ulong)(long)unit.ArmorLevel);
-                Fold(ref hash, (ulong)(long)unit.Hp);
-                Fold(ref hash, unit.Tags.Bits);
-            }
+                ulong hash = FnvOffsetBasis;
 
-            Fold(ref hash, ProjectileSectionMarker);
-            Fold(ref hash, (ulong)projectiles.Count);
-            for (int i = 0; i < projectiles.Count; i++)
-            {
-                ProjectileReadView projectile = projectiles[i];
-                Fold(ref hash, ProjectileItemMarker);
-                Fold(ref hash, (ulong)(long)projectile.Handle.Index);
-                Fold(ref hash, (ulong)(long)projectile.Handle.Generation);
-                Fold(ref hash, (ulong)(long)projectile.Owner.Index);
-                Fold(ref hash, (ulong)(long)projectile.Owner.Generation);
-                Fold(ref hash, (ulong)Quantize(projectile.Position.X));
-                Fold(ref hash, (ulong)Quantize(projectile.Position.Y));
-                Fold(ref hash, (ulong)Quantize(projectile.Velocity.X));
-                Fold(ref hash, (ulong)Quantize(projectile.Velocity.Y));
-                Fold(ref hash, (ulong)(long)projectile.Damage);
-                Fold(ref hash, projectile.Tags.Bits);
-            }
+                Fold(ref hash, UnitSectionMarker);
+                Fold(ref hash, (ulong)units.Count);
+                for (int i = 0; i < units.Count; i++)
+                {
+                    UnitReadView unit = units[i];
+                    Fold(ref hash, UnitItemMarker);
+                    Fold(ref hash, (ulong)(long)unit.Handle.Index);
+                    Fold(ref hash, (ulong)(long)unit.Handle.Generation);
+                    Fold(ref hash, (ulong)Quantize(unit.Position.X));
+                    Fold(ref hash, (ulong)Quantize(unit.Position.Y));
+                    Fold(ref hash, (ulong)Quantize(unit.Radius));
+                    Fold(ref hash, (ulong)(long)unit.ArmorLevel);
+                    Fold(ref hash, (ulong)(long)unit.Hp);
+                    Fold(ref hash, unit.Tags.Bits);
+                }
 
-            return unchecked((long)hash);
+                Fold(ref hash, ProjectileSectionMarker);
+                Fold(ref hash, (ulong)projectiles.Count);
+                for (int i = 0; i < projectiles.Count; i++)
+                {
+                    ProjectileReadView projectile = projectiles[i];
+                    Fold(ref hash, ProjectileItemMarker);
+                    Fold(ref hash, (ulong)(long)projectile.Handle.Index);
+                    Fold(ref hash, (ulong)(long)projectile.Handle.Generation);
+                    Fold(ref hash, (ulong)(long)projectile.Owner.Index);
+                    Fold(ref hash, (ulong)(long)projectile.Owner.Generation);
+                    Fold(ref hash, (ulong)Quantize(projectile.Position.X));
+                    Fold(ref hash, (ulong)Quantize(projectile.Position.Y));
+                    Fold(ref hash, (ulong)Quantize(projectile.Velocity.X));
+                    Fold(ref hash, (ulong)Quantize(projectile.Velocity.Y));
+                    Fold(ref hash, (ulong)(long)projectile.Damage);
+                    Fold(ref hash, projectile.Tags.Bits);
+                }
+
+                return (long)hash;
+            }
         }
 
         /// <summary>把坐标/速度量化到 1/1000（四舍五入、负数远离零），NaN / 无穷归一为 0。</summary>

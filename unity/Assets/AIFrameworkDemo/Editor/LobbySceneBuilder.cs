@@ -114,6 +114,13 @@ namespace AIFramework.Demo.Editor
             Button match3Button = CreateButton("Match3Button", root, "进入三消场景");
             SetHeight(match3Button.gameObject, RowHeight);
 
+            // 其余玩法场景统一用 SceneNavigator：不用往 LobbyController 里塞一堆字段，
+            // 场景装配校验也会自动检查这些按钮的 targetScene/button 有没有漏注入。
+            CreateSceneEntry(root, "ArenaButton", "进入竞技场场景", "ArenaScene");
+            CreateSceneEntry(root, "TowerDefenseButton", "进入塔防场景", "TowerDefenseScene");
+            CreateSceneEntry(root, "IdleButton", "进入放置场景", "IdleScene");
+            CreateSceneEntry(root, "GachaButton", "进入抽卡场景", "GachaScene");
+
             // 控制器与四个皮肤
             var lobbyGo = new GameObject("Lobby");
             var controller = lobbyGo.AddComponent<LobbyController>();
@@ -261,6 +268,26 @@ namespace AIFramework.Demo.Editor
             text.fontSize = 16;
             text.alignment = alignment;
             text.color = new Color(0.9f, 0.9f, 0.9f, 1f);
+        }
+
+        /// <summary>建一个"进入某场景"的按钮 + SceneNavigator（跳转逻辑复用，不写进 LobbyController）。</summary>
+        private static void CreateSceneEntry(Transform parent, string name, string label, string targetScene)
+        {
+            Button button = CreateButton(name, parent, label);
+            SetHeight(button.gameObject, RowHeight);
+
+            var navGo = new GameObject(name + "Navigator");
+            var navigator = navGo.AddComponent<AIFramework.Adapters.Unity.Scene.SceneNavigator>();
+            SetString(navigator, "targetScene", targetScene);
+            SetReference(navigator, "button", button);
+        }
+
+        /// <summary>用 SerializedObject 给私有字符串字段赋值。</summary>
+        private static void SetString(Object target, string fieldName, string value)
+        {
+            var serialized = new SerializedObject(target);
+            serialized.FindProperty(fieldName).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void SetHeight(GameObject target, float height)

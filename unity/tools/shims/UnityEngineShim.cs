@@ -17,6 +17,11 @@ namespace UnityEngine
 
         /// <summary>与 UnityEngine.Object.Instantiate(Object, Transform) 同形；派生类的非限定调用靠它解析。</summary>
         public static T Instantiate<T>(T original, Transform parent) where T : Object { return original; }
+
+        /// <summary>销毁对象（形状桩）：真实 Unity 里是延迟销毁，帧末才真正移除。</summary>
+        public static void Destroy(Object target)
+        {
+        }
     }
 
     public class Component : Object
@@ -63,6 +68,7 @@ namespace UnityEngine
         {
             return new GameObject(type.ToString());
         }
+
 
         public void SetActive(bool value) { activeSelf = value; }
 
@@ -163,6 +169,20 @@ namespace UnityEngine
     /// <summary>字体资产（形状桩）。</summary>
     public class Font : Object
     {
+    }
+
+    /// <summary>材质（形状桩）。</summary>
+    public class Material : Object
+    {
+        /// <summary>颜色。</summary>
+        public Color color;
+    }
+
+    /// <summary>渲染器（形状桩）。</summary>
+    public class Renderer : Component
+    {
+        /// <summary>材质实例。</summary>
+        public Material material = new Material();
     }
 
     /// <summary>资源加载（桩：只支持内置资源，返回空对象）。</summary>
@@ -296,6 +316,8 @@ namespace UnityEngine
         }
     }
 }
+
+
 
 
 
