@@ -4,7 +4,10 @@ using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
+using AIFramework.Core.Meta;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Inventory;
+using AIFramework.Features.Quest;
 using AIFramework.Kernel.Realtime;
 using System;
 using System.Collections.Generic;
@@ -28,9 +31,12 @@ namespace AIFramework.Adapters.Console
         private readonly CausalTagRegistry _registry;
         private readonly RingCausalLog _log;
         private readonly SystemTimeProvider _time;
-        private readonly MockBinaryTableLoader _tables;
-        private readonly MockInventory _inventory;
+        private readonly DirectoryBinaryTableLoader _tables;
+        private readonly InventoryHandler _inventory;
+        private readonly RedDotTree _redDots;
         private readonly MockSpatialWorld _spatial;
+        private readonly string _storageDirectory;
+        private readonly FileSystemStoragePort _storage;
         private readonly CqeBus _innerBus;
         private readonly LoggingCqeBus _bus;
         private readonly DemoKernelFactory _factory;
@@ -43,9 +49,13 @@ namespace AIFramework.Adapters.Console
             _registry = new CausalTagRegistry();
             _log = new RingCausalLog(256);
             _time = new SystemTimeProvider();
-            _tables = new MockBinaryTableLoader();
-            _inventory = new MockInventory();
+            _tables = new DirectoryBinaryTableLoader(ResolveDemoTablesDirectory());
+            _inventory = new InventoryHandler();
+            _redDots = new RedDotTree();
             _spatial = new MockSpatialWorld();
+            _storageDirectory = Path.Combine(
+                Path.GetTempPath(), "aiframework-smoke", Guid.NewGuid().ToString("N"));
+            _storage = new FileSystemStoragePort(_storageDirectory);
             _innerBus = new CqeBus();
 
             int adapterTagId = _registry.Register("adapter.console");
@@ -86,17 +96,24 @@ namespace AIFramework.Adapters.Console
 
             ExportCausalLog();
             RunStorageSmoke(signIn);
+
+            RunLobbyDemo();
+            PublishBattleFacts();
+            CleanupStorage();
+
             _writer.WriteLine("Realtime 推进帧数=" + realtimeFrames + "，最终道具=" + DescribeInventory());
             _writer.WriteLine("=== 冒烟结束 ===");
         }
 
+        /// <summary>
+        /// 装配背包切片：注册到**日志总线**（<c>_bus</c>）而不是裸总线，
+        /// 这样冒烟时因果日志能记录每一条发放/消耗，切片本身并不知道日志存在。
+        /// </summary>
         private void WireInventory()
         {
-            _innerBus.RegisterCommandHandler<GrantItemCommand>(_inventory);
-            _innerBus.RegisterCommandHandler<ConsumeItemCommand>(_inventory);
-            _innerBus.RegisterQueryHandler<InventoryQueryRequest, InventorySnapshot>(
-                new MockInventoryQueryHandler(_inventory));
-            _inventory.Seed(9001, 0);
+            _inventory.Register(_bus);
+            _redDots.Register(_bus);
+            _inventory.Seed(MetaItemIds.RetroactiveCard, 0);
         }
 
         private SignInPresenter WireDailySignIn(out SignInHandler signIn)
@@ -270,7 +287,7 @@ namespace AIFramework.Adapters.Console
 
         private string DescribeInventory()
         {
-            IReadOnlyList<KeyValuePair<int, int>> snapshot = _inventory.Snapshot();
+            IReadOnlyList<InventoryEntry> snapshot = _inventory.Snapshot();
             if (snapshot.Count == 0)
             {
                 return "空";
@@ -284,13 +301,90 @@ namespace AIFramework.Adapters.Console
                     builder.Append(", ");
                 }
 
-                builder.Append(snapshot[i].Key).Append('=').Append(snapshot[i].Value);
+                builder.Append(snapshot[i].ItemId).Append('=').Append(snapshot[i].Count);
             }
 
             return builder.ToString();
         }
 
-        private static string DescribeLoots(GameplayResult result)
+        /// <summary>跑一遍大厅链路（商店/任务/邮件/红点/弹窗/存档），验证 Meta 切片真的能协作。</summary>
+        private void RunLobbyDemo()
+        {
+            var lobby = new LobbyDemo(_writer, _bus, _time, _tables, _storage, _inventory, _redDots);
+            lobby.Wire();
+            lobby.Run();
+        }
+
+        /// <summary>
+        /// 把两场内核对战结果翻成 <see cref="GameFinishedEvent"/> 广播出去：
+        /// 任务/活动类切片只依赖这个事实，不需要知道打的是哪个内核。
+        /// </summary>
+        private void PublishBattleFacts()
+        {
+            var turn = new GameFinishedEvent(GameplayKernelType.Turn, 1, isVictory: true);
+            _bus.Publish(in turn);
+            var realtime = new GameFinishedEvent(GameplayKernelType.Realtime, 2, isVictory: false);
+            _bus.Publish(in realtime);
+
+            var query = new QuestListQueryRequest();
+            QuestListSnapshot quests = _bus.Query<QuestListQueryRequest, QuestListSnapshot>(in query);
+            var builder = new System.Text.StringBuilder();
+            for (int i = 0; i < quests.Quests.Count; i++)
+            {
+                if (i > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                QuestViewData quest = quests.Quests[i];
+                builder.Append('Q').Append(quest.QuestId).Append(' ')
+                    .Append(quest.Progress).Append('/').Append(quest.TargetCount);
+            }
+
+            _writer.WriteLine("[Quest] 两场战斗后进度：" + builder);
+        }
+
+        /// <summary>
+        /// 定位配置表夹具目录：优先输出目录下的 <c>DemoTables</c>（csproj 会拷贝），
+        /// 其次回退到源码目录（直接用 dotnet run 从仓根启动时）。
+        /// </summary>
+        private static string ResolveDemoTablesDirectory()
+        {
+            string outputLocal = Path.Combine(AppContext.BaseDirectory, "DemoTables");
+            if (Directory.Exists(outputLocal))
+            {
+                return outputLocal;
+            }
+
+            // 从 bin/Debug/net10.0 回溯到工程目录：…/bin/<cfg>/<tfm> → 上三级
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; i < 4 && directory != null; i++)
+            {
+                directory = directory.Parent;
+                if (directory == null)
+                {
+                    break;
+                }
+
+                string candidate = Path.Combine(directory.FullName, "DemoTables");
+                if (Directory.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            // 最后兜底：仓根的 unity StreamingAssets（与 Unity 侧读同一份夹具）
+            return Path.Combine("unity", "Assets", "StreamingAssets", "AIFrameworkDemo");
+        }
+
+        /// <summary>清理本次冒烟创建的临时存档目录（幂等）。</summary>
+        private void CleanupStorage()
+        {
+            if (Directory.Exists(_storageDirectory))
+            {
+                Directory.Delete(_storageDirectory, recursive: true);
+            }
+        }        private static string DescribeLoots(GameplayResult result)
         {
             IReadOnlyList<LootItem> loots = result.Loots;
             if (loots.Count == 0)

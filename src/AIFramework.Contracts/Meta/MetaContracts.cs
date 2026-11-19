@@ -74,10 +74,4 @@ namespace AIFramework.Contracts.Meta
 
         public int Count { get; }
     }
-
-    /// <summary>背包只读查询端口：切片只能读数量，写必须走 Command。</summary>
-    public interface IInventoryQuery : Cqe.IQuery<InventorySnapshot>
-    {
-        int ItemId { get; }
-    }
 }

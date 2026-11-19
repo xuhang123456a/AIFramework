@@ -13,4 +13,9 @@
     <ProjectReference Include="..\..\AIFramework.Features\AIFramework.Features.csproj" />
   </ItemGroup>
 
+  <!-- 配置表夹具随构建拷到输出目录：Console 与 Unity 读同一份字节，避免两边数值分叉 -->
+  <ItemGroup>
+    <None Include="DemoTables\**\*.bin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
