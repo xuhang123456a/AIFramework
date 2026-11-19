@@ -3,7 +3,7 @@
 > **一句话**：引擎无关（纯 C#）的游戏框架 —— 一套 CQE 契约 + 两套玩法内核 + 十四个业务切片 + 十七个 Unity 场景，
 > 所有玩法共用同一个总线/背包/红点/存档/因果日志，新增玩法不改其它模块。
 >
-> 当前状态（2026-11-20）：**1033 个纯逻辑测试 + 11 个 Unity EditMode 测试 + 19 个 PlayMode 测试全绿**；
+> 当前状态（2026-11-20）：**1135 个纯逻辑测试 + 11 个 Unity EditMode 测试 + 24 个 PlayMode 测试全绿**；
 > 十七个场景离屏生成并通过装配校验；`AIFramework.exe` 真出包 60 MB。
 
 ---
@@ -81,4 +81,6 @@ Doc/                          架构总纲 / 切片规范与验证流 / 玩法�
 - **Unity 音频未真机听**：`IAudioService` 与 `AudioSource` 池只过了形状校验。
 - **异步 PVP 的对手池由本地公式生成**（注释标明"真实环境由服务端下发"）；`IMatchValidator` 的 HTTP 未接线，Unity 侧远端一律返回 `Unavailable`。
 - **HybridCLR 只完成方案文档**，未在工程内安装（原因见 Doc/07 第五节）。
+- **云存档未接真实 HTTP**：`ICloudSaveService` 与合并策略已完成并有 46 例测试，但 Unity 侧是离线模拟（`persistentDataPath/cloudsaves` 文件镜像），远端接口未接线。
+- **帧耗时基线是"整帧间隔"**，不是"本组件耗时"；`GC.GetAllocatedBytesForCurrentThread` 在 IL2CPP 上待真机确认。
 - **跑酷/平台跳跃的自动演示**：跑酷默认 autoPlay 永不撞死（内核只在碰撞时结束），要看结算需关掉 autoPlay 撞一次。

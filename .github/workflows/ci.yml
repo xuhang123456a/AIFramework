@@ -36,7 +36,7 @@ jobs:
       - name: Unity 适配层形状级编译校验（无需 Unity）
         run: pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 
-      - name: 指令表夹具必须与生成器输出一致
+      - name: 配置表导出结果与两个目标目录逐字节一致（与 legacy fixtures 交叉校验）
         run: |
-          dotnet run --project tools/fixtures/Fixtures.csproj --no-build -- --out artifacts/fixtures-check
-          git diff --exit-code --stat
+          dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --verify-against unity/Assets/StreamingAssets/AIFrameworkDemo
+          dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --verify-against src/Adapters/AIFramework.Adapters.Console/DemoTables
