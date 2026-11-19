@@ -69,11 +69,13 @@ namespace AIFramework.Core.Tests.Save
             SaveService service = CreateService(out InMemoryStorage storage);
             byte[] payload = Encoding.UTF8.GetBytes("{\"gold\":42}");
 
-            service.Save(0, new SaveEnvelope(version: 3, payload: payload));
+            // T3-17：schema 版本高于 CurrentVersion 的档被视为"未来档"而拒绝读取，
+            // 所以这里必须用当前版本（原来的 3 已不再合法）。
+            service.Save(0, new SaveEnvelope(version: SaveService.CurrentVersion, payload: payload));
             bool loaded = service.TryLoad(0, out SaveEnvelope envelope);
 
             Assert.True(loaded);
-            Assert.Equal(3, envelope.Version);
+            Assert.Equal(SaveService.CurrentVersion, envelope.Version);
             Assert.Equal(payload, envelope.Payload);
             Assert.Equal(1, storage.WriteCount);
         }
@@ -83,7 +85,8 @@ namespace AIFramework.Core.Tests.Save
         {
             SaveService service = CreateService(out _);
 
-            service.Save(1, new SaveEnvelope(version: 1, payload: Array.Empty<byte>()));
+            // T3-17：v1 负载要过迁移链（空负载不是合法背包），空负载往返改用当前版本。
+            service.Save(1, new SaveEnvelope(version: SaveService.CurrentVersion, payload: Array.Empty<byte>()));
             Assert.True(service.TryLoad(1, out SaveEnvelope envelope));
             Assert.Empty(envelope.Payload);
         }
@@ -207,7 +210,9 @@ namespace AIFramework.Core.Tests.Save
         public void SlotsAreIndependent()
         {
             SaveService service = CreateService(out _);
-            service.Save(0, new SaveEnvelope(1, Encoding.UTF8.GetBytes("a")));
+
+            // T3-17：v1 的 "a" 不是合法背包负载，会被迁移链拒绝，这里统一用当前版本。
+            service.Save(0, new SaveEnvelope(SaveService.CurrentVersion, Encoding.UTF8.GetBytes("a")));
             service.Save(1, new SaveEnvelope(2, Encoding.UTF8.GetBytes("b")));
 
             Assert.True(service.TryLoad(0, out SaveEnvelope first));

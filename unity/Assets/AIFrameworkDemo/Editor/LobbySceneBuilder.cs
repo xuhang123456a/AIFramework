@@ -173,6 +173,8 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "TycoonButton", "进入模拟经营场景", "TycoonScene");
             CreateSceneEntry(root, "IdleRpgButton", "进入挂机 RPG 场景", "IdleRpgScene");
 
+            CreateOverlayLayer(canvas);
+
             // 控制器与四个皮肤
             var lobbyGo = new GameObject("Lobby");
             var controller = lobbyGo.AddComponent<LobbyController>();
@@ -317,8 +319,8 @@ namespace AIFramework.Demo.Editor
             return go;
         }
 
-        /// <summary>给容器挂一个撑满父级的文字子物体（Graphic 互斥规则要求文字单独成物体）。</summary>
-        private static void AttachLabelChild(Transform parent, string label, TextAnchor alignment)
+        /// <summary>给容器挂一个撑满父级的文字子物体（Graphic 互斥规则要求文字单独成物体），返回该 Text 以便注入。</summary>
+        private static Text AttachLabelChild(Transform parent, string label, TextAnchor alignment)
         {
             var textGo = new GameObject("Label");
             var textRect = textGo.AddComponent<RectTransform>();
@@ -334,6 +336,7 @@ namespace AIFramework.Demo.Editor
             text.fontSize = 16;
             text.alignment = alignment;
             text.color = new Color(0.9f, 0.9f, 0.9f, 1f);
+            return text;
         }
 
         /// <summary>建一个"进入某场景"的按钮 + SceneNavigator（跳转逻辑复用，不写进 LobbyController）。</summary>
@@ -348,11 +351,96 @@ namespace AIFramework.Demo.Editor
             SetReference(navigator, "button", button);
         }
 
+        /// <summary>
+        /// 建 Toast / Loading 层：<c>Canvas → OverlayLayer → {Toast, Loading}</c>，
+        /// 挂在 SafeArea <b>之外</b>，所以刘海/挖孔/手势条不会把轻提示挤走，全屏遮罩也是真的全屏。
+        /// <para>
+        /// <b>为什么不给 OverlayLayer 加嵌套 Canvas</b>：父 Canvas 上的 <see cref="CanvasSortOrder"/>
+        /// 在 <c>Awake</c> 里会把所有子 Canvas 统一改成 <c>parentOrder + 1</c>（即 201），
+        /// 与 OverlayLayer 自己想要的 Toast(500) 形成"谁先 Awake 谁生效"的竞态。
+        /// 同一个 Canvas 内真正决定绘制先后的是<b>兄弟顺序</b>，所以 OverlayLayer 作为 Canvas 的
+        /// 最后一个子节点就已经稳定压在 SafeArea 内容之上；<see cref="CanvasSortOrder"/> 仍然挂上并注入
+        /// Toast 层，既记录层级意图，也给 PlayMode 验收留一个可断言的锚点。
+        /// </para>
+        /// <para>
+        /// <b>Toast 与 Loading 的初始可见性都存成 inactive</b>：进场景时不该先闪一条空底条/一帧全黑。
+        /// <see cref="ToastHud.Show"/> 会自行激活自己；<see cref="LoadingOverlay"/> 则只切它自己的 <c>root</c>。
+        /// </para>
+        /// </summary>
+        private static void CreateOverlayLayer(Canvas canvas)
+        {
+            RectTransform overlayLayer = CreateContainer("OverlayLayer", canvas.transform);
+            Stretch(overlayLayer);
+
+            // 层级标记：Toast(500)，UI 层里只低于 Debug(900)。
+            var overlaySort = overlayLayer.gameObject.AddComponent<CanvasSortOrder>();
+            SetInt(overlaySort, "layer", (int)UiLayerKind.Toast);
+
+            // Toast：半透明底挂在根上，文字必须是子物体（同一 GameObject 只能有一个 Graphic）。
+            RectTransform toast = CreateContainer("Toast", overlayLayer);
+            toast.anchorMin = new Vector2(0.15f, 0.72f);
+            toast.anchorMax = new Vector2(0.85f, 0.82f);
+            toast.offsetMin = Vector2.zero;
+            toast.offsetMax = Vector2.zero;
+
+            var toastBackdrop = toast.gameObject.AddComponent<Image>();
+            toastBackdrop.color = new Color(0f, 0f, 0f, 0.65f);
+
+            // 轻提示不该吃点击：底板与文字都关掉 raycast，否则它在显示的 2 秒里会挡住下面的按钮。
+            toastBackdrop.raycastTarget = false;
+
+            var toastHud = toast.gameObject.AddComponent<ToastHud>();
+            Text toastText = AttachLabelChild(toast, "已装载完成", TextAnchor.MiddleCenter);
+            toastText.raycastTarget = false;
+            SetReference(toastHud, "messageText", toastText);
+            toast.gameObject.SetActive(false);
+
+            // Loading：组件常驻在 active 的 Loading 物体上，真正被开关的是它的 Root 底板。
+            RectTransform loading = CreateContainer("Loading", overlayLayer);
+            Stretch(loading);
+            var loadingOverlay = loading.gameObject.AddComponent<LoadingOverlay>();
+
+            RectTransform loadingRoot = CreateContainer("Root", loading);
+            Stretch(loadingRoot);
+
+            var loadingBackdrop = loadingRoot.gameObject.AddComponent<Image>();
+            loadingBackdrop.color = new Color(0f, 0f, 0f, 0.55f);
+
+            Text loadingText = AttachLabelChild(loadingRoot, "加载中…", TextAnchor.MiddleCenter);
+            SetReference(loadingOverlay, "root", loadingRoot.gameObject);
+            SetReference(loadingOverlay, "labelText", loadingText);
+
+            // 与 LoadingOverlay.Awake 里的隐藏双保险：即使有人把场景手改成 active，运行时也不会闪黑。
+            loadingRoot.gameObject.SetActive(false);
+
+            // 演示器：Awake 找两个组件、Start 后自动演"提示 2 秒 → 加载 1 秒"。
+            var overlayDemo = overlayLayer.gameObject.AddComponent<LobbyOverlayDemo>();
+            SetReference(overlayDemo, "toastHud", toastHud);
+            SetReference(overlayDemo, "loadingOverlay", loadingOverlay);
+        }
+
+        /// <summary>把 RectTransform 四向铺满父级（默认 offset 全 0，配合 0..1 锚点即全屏）。</summary>
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
         /// <summary>用 SerializedObject 给私有字符串字段赋值。</summary>
         private static void SetString(Object target, string fieldName, string value)
         {
             var serialized = new SerializedObject(target);
             serialized.FindProperty(fieldName).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>用 SerializedObject 给私有整型/枚举字段赋值（枚举在序列化里就是 int）。</summary>
+        private static void SetInt(Object target, string fieldName, int value)
+        {
+            var serialized = new SerializedObject(target);
+            serialized.FindProperty(fieldName).intValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

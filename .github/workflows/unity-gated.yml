@@ -1,0 +1,85 @@
+name: unity-gated
+
+# Unity 侧闸门（可选）。纯逻辑闸门在 ci.yml 里，不需要任何 Unity 许可。
+#
+# 为什么默认不跑：
+#   1) Unity 需要授权（Personal/Pro 的 .ulf 或 license 账号），GitHub 托管 runner 上没有；
+#   2) 一次完整跑（导入 + 场景生成 + EditMode + PlayMode + 出包）约 20~40 分钟，占满公开额度。
+#
+# 启用方式（二选一）：
+#   A) 仓库 Settings → Secrets 配置 UNITY_LICENSE / UNITY_EMAIL / UNITY_PASSWORD（见下方步骤使用 game-ci）；
+#   B) 自建 self-hosted runner（已装 Unity），并把 runs-on 改成 [self-hosted, unity]。
+#
+# 目前仓库内已在**本地批处理**里验证过同一套流程：
+#   pwsh tools/verify-all.ps1 -Unity     （场景生成 + 装配校验 + EditMode + PlayMode）
+#   pwsh unity/tools/build-player.ps1    （Windows 冒烟包）
+# 本工作流只是把这两步搬到 CI，等有 license 时启用即可。
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_build:
+        description: '是否额外出 Windows 冒烟包'
+        type: boolean
+        default: false
+
+jobs:
+  unity-tests:
+    name: Unity 场景生成 + EditMode + PlayMode
+    if: ${{ vars.UNITY_CI_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 缓存 Unity Library
+        uses: actions/cache@v4
+        with:
+          path: unity/Library
+          key: unity-library-${{ hashFiles('unity/Packages/manifest.json', 'unity/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: unity-library-
+
+      - name: 生成全部场景 + 装配校验（batchmode）
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          unityVersion: auto
+          targetPlatform: StandaloneWindows64
+          buildMethod: AIFramework.Demo.Editor.BuildPlayer.BuildWindows
+          allowDirtyBuild: true
+
+      - name: EditMode 测试
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          testMode: editmode
+          unityVersion: auto
+
+      - name: PlayMode 测试
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity
+          testMode: playmode
+          unityVersion: auto
+
+      - name: 上传测试结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-results
+          path: |
+            unity/artifacts/**/*.xml
+            unity/Build/**

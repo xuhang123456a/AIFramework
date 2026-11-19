@@ -43,7 +43,7 @@ namespace UnityEngine
             get { return _gameObject ?? (_gameObject = new GameObject()); }
         }
 
-        /// <summary>取自身或子节点上的组件（形状桩）。</summary>
+        /// <summary>取自身或子节点上的组件（形状桩）。真实 Unity 在 Component 上也有这个名字。</summary>
         public T GetComponent<T>() where T : Component
         {
             return null!;
@@ -53,6 +53,18 @@ namespace UnityEngine
         public T GetComponentInChildren<T>() where T : Component
         {
             return null!;
+        }
+
+        /// <summary>取自身及子节点上的全部组件（形状桩；真实 Unity 有 bool includeInactive 重载）。</summary>
+        public T[] GetComponentsInChildren<T>(bool includeInactive) where T : Component
+        {
+            return Array.Empty<T>();
+        }
+
+        /// <summary>取自身及子节点上的全部组件（形状桩，默认不含未激活对象）。</summary>
+        public T[] GetComponentsInChildren<T>() where T : Component
+        {
+            return Array.Empty<T>();
         }
     }
 

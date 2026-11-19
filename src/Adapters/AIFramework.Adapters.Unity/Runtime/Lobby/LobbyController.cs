@@ -259,7 +259,7 @@ namespace AIFramework.Adapters.Unity.Lobby
                 host.Inventory.Seed(entries[i].ItemId, entries[i].Count);
             }
 
-            host.Log.Info("[Lobby] 已读档：v" + envelope.Version + "，" + entries.Length + " 种道具。");
+            host.Log.Info("[Lobby] 已读档：schema v" + envelope.SchemaVersion + "，" + entries.Length + " 种道具。");
         }
 
         /// <summary>存档：只把背包快照写盘，走 <see cref="SaveService"/> 的 CRC 包络。</summary>
@@ -279,7 +279,15 @@ namespace AIFramework.Adapters.Unity.Lobby
 
             var query = new InventoryListQueryRequest();
             InventoryListSnapshot snapshot = host.Bus.Query<InventoryListQueryRequest, InventoryListSnapshot>(in query);
-            save.Save(0, new SaveEnvelope(1, InventorySaveCodec.Encode(snapshot.Items)));
+            // 写当前 schema（v2）：v1 旧档仍能被自动迁移读取，这里没必要继续产出旧格式。
+            var entries = new InventorySaveEntry[snapshot.Items.Length];
+            for (int i = 0; i < entries.Length; i++)
+            {
+                InventoryEntrySnapshot item = snapshot.Items[i];
+                entries[i] = new InventorySaveEntry(item.ItemId, item.Count, 0L);
+            }
+
+            save.Save(0, new SaveEnvelope(SaveService.CurrentVersion, InventorySaveCodec.EncodeV2(entries)));
         }
 
         /// <summary>进卡牌战斗场景。宿主随旧场景销毁自然 Dispose，这里不需要手动处理。</summary>

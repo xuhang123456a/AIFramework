@@ -336,24 +336,17 @@ namespace AIFramework.Adapters.Console
         private void RunSaveRoundTrip()
         {
             IReadOnlyList<InventoryEntry> entries = _inventory.Snapshot();
-            byte[] payload;
-            using (var buffer = new MemoryStream(4 + entries.Count * 8))
-            {
-                using (var writer = new BinaryWriter(buffer, System.Text.Encoding.UTF8, leaveOpen: true))
-                {
-                    writer.Write(entries.Count);
-                    for (int i = 0; i < entries.Count; i++)
-                    {
-                        writer.Write(entries[i].ItemId);
-                        writer.Write(entries[i].Count);
-                    }
-                }
 
-                payload = buffer.ToArray();
+            // 用 codec 写 v2（带 updatedTicks），读档走自动识别——v1 旧档也能被读，且不会再出现
+            // "手写 BinaryReader 按 v1 行距解析 v2 字节"这类静默错位。
+            var saveEntries = new InventorySaveEntry[entries.Count];
+            for (int i = 0; i < saveEntries.Length; i++)
+            {
+                saveEntries[i] = new InventorySaveEntry(entries[i].ItemId, entries[i].Count, 0L);
             }
 
             var save = new SaveService(_storage, "lobby");
-            save.Save(0, new SaveEnvelope(version: 1, payload: payload));
+            save.Save(0, new SaveEnvelope(SaveService.CurrentVersion, InventorySaveCodec.EncodeV2(saveEntries)));
 
             if (!save.TryLoad(0, out SaveEnvelope loaded))
             {
@@ -361,18 +354,20 @@ namespace AIFramework.Adapters.Console
                 return;
             }
 
-            using (var reader = new BinaryReader(new MemoryStream(loaded.Payload, writable: false)))
+            if (!InventorySaveCodec.TryDecodeAuto(loaded.Payload, out InventorySaveEntry[] decoded))
             {
-                int count = reader.ReadInt32();
-                var parts = new List<string>(count);
-                for (int i = 0; i < count; i++)
-                {
-                    parts.Add(reader.ReadInt32() + "=" + reader.ReadInt32());
-                }
-
-                _writer.WriteLine("[Save] 背包存档往返（v" + loaded.Version + "，" + loaded.Payload.Length
-                    + " 字节）：" + string.Join(", ", parts));
+                _writer.WriteLine("[Save] 存档往返失败：负载无法解析。");
+                return;
             }
+
+            var parts = new List<string>(decoded.Length);
+            for (int i = 0; i < decoded.Length; i++)
+            {
+                parts.Add(decoded[i].ItemId + "=" + decoded[i].Count);
+            }
+
+            _writer.WriteLine("[Save] 背包存档往返（schema v" + loaded.SchemaVersion + "，" + loaded.Payload.Length
+                + " 字节）：" + string.Join(", ", parts));
         }
 
         private string DescribeInventory()
