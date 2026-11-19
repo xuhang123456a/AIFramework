@@ -29,14 +29,14 @@
 | T1-4 | `Match3` | 三消 | Kernel.Turn 棋盘变体 | 网格状态/消除/连击/目标步数 | [x] 内核+测试+场景 |
 | T1-5 | `RealtimeArena` | MOBA/ARPG 向 | Kernel.Realtime | 技能时间轴/弹幕/位移/打断/固定步长/回放 | [ ] |
 | T1-6 | `TowerDefense` | 塔防 | **双内核共存** | Meta 建造 + Realtime 战斗，验证多卡带隔离 | [ ] |
-| T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [ ] |
-| T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [ ] |
+| T1-7 | `IdleTycoon` | 放置/经营 | Meta + ITimeProvider | 离线收益/升级曲线/时间快进断言 | [x] 切片 + 测试（场景待接） |
+| T1-8 | `Gacha` | 抽卡/扭蛋 | Meta + IRandomSource | 概率表/保底/种子复现/概率公示 | [x] 切片 + 测试（场景待接） |
 
 ## T2 · 品类扩展（每项必须证明一个框架能力）
 
 | # | 品类 | 依赖 | 证明的能力 | 状态 |
 |---|---|---|---|---|
-| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [ ] |
+| T2-1 | 合成 Merge | Meta | 网格状态机 + 配置驱动 | [~] 排队中 |
 | T2-2 | 肉鸽卡牌 | Turn | 随机地图 + 局内构筑 + 种子复现 | [ ] |
 | T2-3 | 自走棋 | Turn | 阵容经济 + 自动战斗推演 | [ ] |
 | T2-4 | 战棋 SRPG | Turn | 网格寻路 + 技能范围仲裁 | [ ] |
@@ -80,7 +80,10 @@
 - 并行作业全部落地：`CardBattleWorld`（抽牌/能量/护盾/敌人行动/30 回合上限）、`Match3World`（8×8/5 色/级联/重力/步数与目标分）、`UnitySceneDirector`+`BootController`+`BootSceneBuilder`、卡牌与三消场景 + HUD
 - 适配层工厂接上两个新卡带（Console `DemoKernelFactory` / Unity `UnityKernelFactory`，卡牌子表走 `TbCard.bin`）
 - 验证：384 例全绿（Core 172 / Features 129 / Adapters 38 / ViewGen 18 / Arch 27）；Console 冒烟四玩法全通
-- 下轮：T2 扩展（合成/战棋等）+ 表现层补强（进度条/动画钩子）+ Unity 真机验收
+- 追加验证闭环：`unity/tools/generate-scenes.ps1` 离屏生成 5 个场景（真实 Unity，0 编译错误），
+  并写回 EditorBuildSettings；修了两个"形状桩验不出、真 Unity 才炸"的问题：缺 `com.unity.ugui`、
+  Image/Text 同 GameObject 冲突
+- 下轮：T2 扩展（合成/战棋等）+ Unity EditMode/PlayMode 自动化 + 表现层补强
 
 ### R3 — 2026-11-20
 - 目标：Unity 场景层落地（大厅场景可点）、离线编译校验扩展到编辑器脚本

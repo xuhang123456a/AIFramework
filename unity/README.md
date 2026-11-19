@@ -82,6 +82,16 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 
 **场景切换纪律**：Boot 场景**不创建宿主**；每个玩法场景自己 `new AIFrameworkUnityHost()` 并在 `OnDestroy` `Dispose()`（`LoadScene` 是同步的，旧场景对象先销毁，宿主时序自然正确）。
 
+### 场景可以离屏批量生成（不需要人点菜单）
+
+```powershell
+pwsh unity/tools/generate-scenes.ps1
+```
+
+它把仓库复制到临时目录（保留 `Library` 做增量导入）→ 在副本里跑 `Unity -batchmode -executeMethod AIFramework.Demo.Editor.GenerateAllScenes.Generate` → 把 `*.unity`、`.meta`、`EditorBuildSettings.asset` 拷回仓库。用户当前开着编辑器也能跑（副本不受工程独占锁影响）。
+
+> 依赖 `com.unity.ugui`（`UnityEngine.UI` 在独立包里，不在 `com.unity.modules.*`）——缺了它 HUD 在真 Unity 里编不过。已写进 `Packages/manifest.json`。
+
 ## 三、把编译守卫接进 Unity（可选，默认不装）
 
 纯逻辑侧的 `AIF001~AIF004` 已经由 `dotnet build` 与 `check-adapter-compile.ps1` 守住；Unity 侧守卫只是"编辑器里实时提示"的便利功能，**默认不安装**。

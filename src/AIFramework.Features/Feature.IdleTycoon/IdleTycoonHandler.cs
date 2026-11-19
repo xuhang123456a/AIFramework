@@ -184,7 +184,7 @@ namespace AIFramework.Features.IdleTycoon
 
         /// <summary>
         /// 按累计产出率分摊本次总额：<c>share_i = floor(elapsed × 累计率_i) - floor(elapsed × 累计率_i-1)</c>。
-        /// 差额法保证所有事件金额之和恰好等于 <paramref name="total"/>，不会因逐栋向下取整而漏金币。
+        /// 差额法保证所有事件金额之和恰好等于本次发放的金币总额，不会因逐栋向下取整而漏金币。
         /// </summary>
         private void PublishCollectedEvents(double elapsed)
         {
