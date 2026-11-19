@@ -100,6 +100,7 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, BulletHellScenePath);
             AddIfSceneExists(scenes, RunnerScenePath);
             AddIfSceneExists(scenes, PlatformerScenePath);
+            AddIfSceneExists(scenes, RoguelikeScenePath);
             AddIfSceneExists(scenes, DemoScenePath);
 
             if (scenes.Count == 0)
@@ -182,6 +183,9 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>平台跳跃场景路径。</summary>
         private const string PlatformerScenePath = "Assets/AIFrameworkDemo/Scenes/PlatformerScene.unity";
+
+        /// <summary>肉鸽卡牌场景路径。</summary>
+        private const string RoguelikeScenePath = "Assets/AIFrameworkDemo/Scenes/RoguelikeScene.unity";
 
         /// <summary>Realtime 最小演示场景路径。</summary>
         private const string DemoScenePath = "Assets/AIFrameworkDemo/Scenes/DemoScene.unity";

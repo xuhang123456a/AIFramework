@@ -39,6 +39,7 @@ namespace AIFramework.Demo.Editor
             BulletHellSceneBuilder.CreateBulletHellScene();
             RunnerSceneBuilder.CreateRunnerScene();
             PlatformerSceneBuilder.CreatePlatformerScene();
+            RoguelikeSceneBuilder.CreateRoguelikeScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），

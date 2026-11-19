@@ -62,6 +62,7 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/BulletHellScene.unity", typeof(BulletHellController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/RunnerScene.unity", typeof(RunnerController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/PlatformerScene.unity", typeof(PlatformerController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/RoguelikeScene.unity", typeof(RoguelikeController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 

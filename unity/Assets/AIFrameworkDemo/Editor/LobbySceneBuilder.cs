@@ -147,6 +147,7 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "BulletHellButton", "进入弹幕场景", "BulletHellScene");
             CreateSceneEntry(root, "RunnerButton", "进入跑酷场景", "RunnerScene");
             CreateSceneEntry(root, "PlatformerButton", "进入平台跳跃场景", "PlatformerScene");
+            CreateSceneEntry(root, "RoguelikeButton", "进入肉鸽卡牌场景", "RoguelikeScene");
 
             // 控制器与四个皮肤
             var lobbyGo = new GameObject("Lobby");
