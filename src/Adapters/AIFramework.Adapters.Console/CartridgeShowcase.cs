@@ -6,6 +6,7 @@ using AIFramework.Contracts.Ports;
 using AIFramework.Kernel.Turn.AutoChess;
 using AIFramework.Kernel.Turn.Puzzle;
 using AIFramework.Kernel.Turn.Rhythm;
+using AIFramework.Kernel.Turn.Runner;
 using AIFramework.Kernel.Turn.Tetris;
 
 namespace AIFramework.Adapters.Console
@@ -27,6 +28,7 @@ namespace AIFramework.Adapters.Console
             RunTetris(writer);
             RunAutoChess(writer);
             RunRhythm(writer);
+            RunRunner(writer);
         }
 
         private static void RunPuzzle(IIOWriter writer)
@@ -95,6 +97,22 @@ namespace AIFramework.Adapters.Console
                 + " Perfect=" + world.PerfectCount + " Miss=" + world.MissCount
                 + " 最大连击=" + world.MaxCombo + " 准确率=" + world.Accuracy.ToString("P1")
                 + " 结束=" + world.IsFinished);
+        }
+
+        private static void RunRunner(IIOWriter writer)
+        {
+            var world = new RunnerWorld(new GameplayInitData(levelId: 1, randomSeed: 20261120, unitCount: 0));
+
+            // 跑 10 秒，途中跳一次、蹲一次；全程 < 500 分说明没赢，只做状态机稳定性演示。
+            world.TryJump();
+            for (int i = 0; i < 100; i++)
+            {
+                world.Tick(0.1d);
+            }
+
+            writer.WriteLine("[Runner] 距离=" + world.Distance.ToString("F1") + "m 分数=" + world.Score
+                + " 速度=" + world.Speed.ToString("F1") + "m/s 障碍=" + world.ObstacleCount
+                + " 结束=" + world.IsGameOver);
         }
 
         private static string DescribeLoots(GameplayResult result)
