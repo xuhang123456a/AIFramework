@@ -102,6 +102,14 @@ namespace AIFramework.Demo.Editor
             SetReference(hud, "boardRoot", board);
             SetReference(hud, "cellTemplate", cellTemplate);
 
+            // 返回大厅：SceneNavigator 统一处理"同场景不重载 / 场景缺失不崩"
+            Button backButton = CreateButton("BackToLobbyButton", root, "返回大厅");
+            SetHeight(backButton.gameObject, 34);
+            var navGo = new GameObject("SceneNavigator");
+            var navigator = navGo.AddComponent<AIFramework.Adapters.Unity.Scene.SceneNavigator>();
+            SetString(navigator, "targetScene", "LobbyScene");
+            SetReference(navigator, "button", backButton);
+
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
 
@@ -184,6 +192,31 @@ namespace AIFramework.Demo.Editor
             return go;
         }
 
+        /// <summary>建一个带文字标签的按钮（本场景只用来做"返回大厅"）。</summary>
+        private static Button CreateButton(string name, Transform parent, string label)
+        {
+            var go = new GameObject(name);
+            var rect = go.AddComponent<RectTransform>();
+            rect.SetParent(parent, false);
+
+            var image = go.AddComponent<Image>();
+            image.color = new Color(0.22f, 0.3f, 0.45f, 1f);
+
+            var button = go.AddComponent<Button>();
+
+            var textGo = new GameObject("Label");
+            var textRect = textGo.AddComponent<RectTransform>();
+            textRect.SetParent(go.transform, false);
+            var text = textGo.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.text = label;
+            text.fontSize = 16;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(1f, 1f, 1f, 1f);
+
+            return button;
+        }
+
         private static void SetHeight(GameObject target, float height)
         {
             var element = target.AddComponent<LayoutElement>();
@@ -199,6 +232,14 @@ namespace AIFramework.Demo.Editor
         }
 
         /// <summary>用 SerializedObject 给私有 <c>[SerializeField]</c> 字段赋值（不依赖字段可见性）。</summary>
+        /// <summary>用 SerializedObject 给私有字符串字段赋值。</summary>
+        private static void SetString(Object target, string fieldName, string value)
+        {
+            var serialized = new SerializedObject(target);
+            serialized.FindProperty(fieldName).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static void SetReference(Object target, string fieldName, Object value)
         {
             var serialized = new SerializedObject(target);

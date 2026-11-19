@@ -74,7 +74,11 @@
 
 ## 轮次日志（每轮追加，最新在上）
 
-### R4 — 2026-11-20（进行中）
+### R5 — 2026-11-20
+- 完成：`Feature.IdleTycoon`（离线收益/升级/24h 封顶）、`Feature.Gacha`（权重抽取 + 10 抽保底）、场景装配校验器、离屏场景生成流水线
+- 场景导航：大厅 → 卡牌/三消、战斗场景 → 大厅（`SceneNavigator` + `UnitySceneDirector`），场景重新生成并通过装配校验
+
+### R4 — 2026-11-20
 - 目标：T1-3 卡牌回合 + T1-4 三消两套内核内容；T1-1 Boot 场景与场景切换
 - 契约：`GameplayKernelType.CardBattle/Match3`；`CardViewData`/`ICardBattleReadView`/`ICardBattleInput`；`IMatch3ReadView`/`IMatch3Input`；`TbCard` 夹具（20 字节/行，84 字节 4 行）
 - 并行作业全部落地：`CardBattleWorld`（抽牌/能量/护盾/敌人行动/30 回合上限）、`Match3World`（8×8/5 色/级联/重力/步数与目标分）、`UnitySceneDirector`+`BootController`+`BootSceneBuilder`、卡牌与三消场景 + HUD

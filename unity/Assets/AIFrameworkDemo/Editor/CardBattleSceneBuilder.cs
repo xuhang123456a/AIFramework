@@ -108,6 +108,14 @@ namespace AIFramework.Demo.Editor
             SetReference(hud, "cardTemplate", cardTemplate);
             SetReference(hud, "endTurnButton", endTurnButton);
 
+            // 返回大厅：SceneNavigator 统一处理"同场景不重载 / 场景缺失不崩"
+            Button backButton = CreateButton("BackToLobbyButton", root, "返回大厅");
+            SetHeight(backButton.gameObject, 34);
+            var navGo = new GameObject("SceneNavigator");
+            var navigator = navGo.AddComponent<AIFramework.Adapters.Unity.Scene.SceneNavigator>();
+            SetString(navigator, "targetScene", "LobbyScene");
+            SetReference(navigator, "button", backButton);
+
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
 
@@ -230,6 +238,14 @@ namespace AIFramework.Demo.Editor
         }
 
         /// <summary>用 SerializedObject 给私有 <c>[SerializeField]</c> 对象引用赋值（不依赖字段可见性）。</summary>
+        /// <summary>用 SerializedObject 给私有字符串字段赋值。</summary>
+        private static void SetString(Object target, string fieldName, string value)
+        {
+            var serialized = new SerializedObject(target);
+            serialized.FindProperty(fieldName).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static void SetReference(Object target, string fieldName, Object value)
         {
             var serialized = new SerializedObject(target);

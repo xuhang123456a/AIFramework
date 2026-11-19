@@ -82,6 +82,8 @@ src/Adapters/AIFramework.Adapters.Unity -> com.aiframework.adapters.unity
 
 **场景切换纪律**：Boot 场景**不创建宿主**；每个玩法场景自己 `new AIFrameworkUnityHost()` 并在 `OnDestroy` `Dispose()`（`LoadScene` 是同步的，旧场景对象先销毁，宿主时序自然正确）。
 
+**场景间导航**：大厅有「进入卡牌战斗场景」「进入三消场景」两个按钮；战斗场景有「返回大厅」。跳转统一走 `SceneNavigator` + `UnitySceneDirector`（同场景不重载、场景缺失只打错误日志不崩）。切场景前大厅会先存一次背包。
+
 ### 场景可以离屏批量生成（不需要人点菜单）
 
 ```powershell

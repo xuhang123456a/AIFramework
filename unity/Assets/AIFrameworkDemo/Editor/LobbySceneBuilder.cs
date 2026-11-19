@@ -107,6 +107,12 @@ namespace AIFramework.Demo.Editor
             Button battleButton = CreateButton("BattleButton", root, "打一场（Realtime 内核）");
             SetHeight(battleButton.gameObject, RowHeight);
 
+            Button cardBattleButton = CreateButton("CardBattleButton", root, "进入卡牌战斗场景");
+            SetHeight(cardBattleButton.gameObject, RowHeight);
+
+            Button match3Button = CreateButton("Match3Button", root, "进入三消场景");
+            SetHeight(match3Button.gameObject, RowHeight);
+
             // 控制器与四个皮肤
             var lobbyGo = new GameObject("Lobby");
             var controller = lobbyGo.AddComponent<LobbyController>();
@@ -121,6 +127,8 @@ namespace AIFramework.Demo.Editor
             SetReference(controller, "mailHud", mailHud);
             SetReference(controller, "battleButton", battleButton);
             SetReference(controller, "statusText", status);
+            SetReference(controller, "cardBattleButton", cardBattleButton);
+            SetReference(controller, "match3Button", match3Button);
 
             SetReference(signInHud, "grid", signInGrid);
             SetReference(signInHud, "slotTemplate", slotTemplate);

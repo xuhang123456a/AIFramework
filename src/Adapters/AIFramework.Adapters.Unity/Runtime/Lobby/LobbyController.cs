@@ -3,6 +3,7 @@ using System;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Core.Save;
+using AIFramework.Adapters.Unity.Scene;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Mail;
@@ -41,6 +42,15 @@ namespace AIFramework.Adapters.Unity.Lobby
 
         /// <summary>状态行文本。</summary>
         [SerializeField] private Text statusText = null!;
+
+        /// <summary>场景跳转器（懒创建，不参与序列化）。</summary>
+        private UnitySceneDirector? _sceneDirector;
+
+        /// <summary>进入卡牌战斗场景。</summary>
+        [SerializeField] private Button? cardBattleButton = null;
+
+        /// <summary>进入三消场景。</summary>
+        [SerializeField] private Button? match3Button = null;
 
         private AIFrameworkUnityHost? _host;
         private SignInPresenter? _signIn;
@@ -82,6 +92,16 @@ namespace AIFramework.Adapters.Unity.Lobby
 
             TryLoadInventory();
             SetStatus("装载完成：" + DescribeAvailability(host));
+           
+            if (cardBattleButton != null)
+            {
+                cardBattleButton.onClick.AddListener(GoCardBattle);
+            }
+
+            if (match3Button != null)
+            {
+                match3Button.onClick.AddListener(GoMatch3);
+            }
         }
 
         private void Start()
@@ -98,6 +118,16 @@ namespace AIFramework.Adapters.Unity.Lobby
             }
 
             SaveInventory();
+
+            if (cardBattleButton != null)
+            {
+                cardBattleButton.onClick.RemoveListener(GoCardBattle);
+            }
+
+            if (match3Button != null)
+            {
+                match3Button.onClick.RemoveListener(GoMatch3);
+            }
 
             _signIn?.Dispose();
             _signIn = null;
@@ -231,6 +261,28 @@ namespace AIFramework.Adapters.Unity.Lobby
             var query = new InventoryListQueryRequest();
             InventoryListSnapshot snapshot = host.Bus.Query<InventoryListQueryRequest, InventoryListSnapshot>(in query);
             save.Save(0, new SaveEnvelope(1, InventorySaveCodec.Encode(snapshot.Items)));
+        }
+
+        /// <summary>进卡牌战斗场景。宿主随旧场景销毁自然 Dispose，这里不需要手动处理。</summary>
+        private void GoCardBattle()
+        {
+            LoadScene("CardBattleScene");
+        }
+
+        /// <summary>进三消场景。</summary>
+        private void GoMatch3()
+        {
+            LoadScene("Match3Scene");
+        }
+
+        private void LoadScene(string sceneName)
+        {
+            SaveInventory();
+            _sceneDirector ??= new UnitySceneDirector(new UnityLogger("[AIFramework/Lobby] "));
+            if (!_sceneDirector.Load(sceneName))
+            {
+                SetStatus("场景加载失败：" + sceneName + "（检查 Build Settings）");
+            }
         }
 
         private void SetStatus(string message)
