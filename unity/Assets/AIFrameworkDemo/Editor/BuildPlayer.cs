@@ -30,7 +30,18 @@ namespace AIFramework.Demo.Editor
             }
 
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-            string outputPath = Path.Combine(projectRoot, OutputDirectory, "AIFramework.exe");
+
+            // 脚本后端可切换：默认 Mono（出包快，做冒烟包用）；设环境变量 AIFW_IL2CPP=1 走 IL2CPP
+            // （HybridCLR 的 AOT 元数据与热更 dll 只有 IL2CPP 包才有意义）。
+            bool useIl2cpp = string.Equals(
+                System.Environment.GetEnvironmentVariable("AIFW_IL2CPP"), "1", StringComparison.Ordinal);
+            PlayerSettings.SetScriptingBackend(
+                BuildTargetGroup.Standalone,
+                useIl2cpp ? ScriptingImplementation.IL2CPP : ScriptingImplementation.Mono2x);
+            Debug.Log("[Build] scriptingBackend=" + (useIl2cpp ? "IL2CPP" : "Mono"));
+
+            string outputDir = useIl2cpp ? OutputDirectory + "-IL2CPP" : OutputDirectory;
+            string outputPath = Path.Combine(projectRoot, outputDir, "AIFramework.exe");
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
             var options = new BuildPlayerOptions

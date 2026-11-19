@@ -53,6 +53,29 @@ namespace UnityEditor
     }
 
     /// <summary>资产数据库桩。</summary>
+    /// <summary>脚本后端（形状桩）。</summary>
+    public enum ScriptingImplementation
+    {
+        Mono2x = 0,
+        IL2CPP = 1,
+    }
+
+    /// <summary>构建目标分组（形状桩）。</summary>
+    public enum BuildTargetGroup
+    {
+        Unknown = 0,
+        Standalone = 1,
+    }
+
+    /// <summary>项目设置（形状桩）。</summary>
+    public static class PlayerSettings
+    {
+        /// <summary>设置脚本后端（桩）。</summary>
+        public static void SetScriptingBackend(BuildTargetGroup targetGroup, ScriptingImplementation implementation)
+        {
+        }
+    }
+
     public static class AssetDatabase
     {
         /// <summary>目录是否存在（桩：永远 true，避免把真实路径判断带进编译校验）。</summary>
@@ -63,6 +86,16 @@ namespace UnityEditor
 
         /// <summary>刷新（桩）。</summary>
         public static void Refresh()
+        {
+        }
+
+        /// <summary>创建资源（桩）。</summary>
+        public static void CreateAsset(UnityEngine.Object asset, string path)
+        {
+        }
+
+        /// <summary>删除资源（桩）。</summary>
+        public static void DeleteAsset(string path)
         {
         }
 
@@ -159,6 +192,16 @@ namespace UnityEditor
         public SerializedProperty GetArrayElementAtIndex(int index)
         {
             return new SerializedProperty();
+        }
+
+        /// <summary>插入数组元素（桩）。</summary>
+        public void InsertArrayElementAtIndex(int index)
+        {
+        }
+
+        /// <summary>删除数组元素（桩）。</summary>
+        public void DeleteArrayElementAtIndex(int index)
+        {
         }
     }
 

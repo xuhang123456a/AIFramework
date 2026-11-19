@@ -24,6 +24,20 @@ namespace UnityEngine
         }
     }
 
+    /// <summary>可序列化资源基类（形状桩）：HybridCLR 设置资产用到 CreateInstance(Type)。</summary>
+    public class ScriptableObject : Object
+    {
+        public static ScriptableObject CreateInstance(Type type)
+        {
+            return (ScriptableObject)Activator.CreateInstance(type)!;
+        }
+
+        public static T CreateInstance<T>() where T : ScriptableObject
+        {
+            return Activator.CreateInstance<T>();
+        }
+    }
+
     public class Component : Object
     {
         private Transform? _transform;

@@ -149,3 +149,16 @@
 4. 真机（Windows/Android）验证：热更 dll 版本替换、AOT 泛型缺失报错、回滚到内置版本。
 
 以上 4 项都依赖"完整 IL2CPP 出包 + 真机跑起来"，属于本仓当前唯一还停在 `[~]` 的条目（T3-8）。
+### 本轮追加（热更程序集 + 设置资产）
+
+| 项 | 结果 |
+|---|---|
+| 热更程序集 | `unity/Assets/HotUpdate/AIFramework.HotUpdate.asmdef`（`noEngineReferences: true`，只引 `AIFramework.Contracts`） |
+| 热更入口 | `HotUpdateInfo.Describe()` / `SelfCheck()`：用框架契约做无副作用自检，证明 dll 里的类型系统与 Contracts 一致 |
+| 设置资产 | `Assets/HybridCLRGenerate/HybridCLRSettings.asset`（由 `HybridClrBootstrap.ConfigureHotUpdateAssembly()` 创建） |
+| hotUpdateAssemblies | 实测写入 `AIFramework.HotUpdate`（幂等，重复执行不重复加） |
+| 元数据生成 | `PrebuildCommand.GenerateAll()` **失败于 `GenerateStripedAOTDlls`**——这是**设计前置**：该步需要先有 IL2CPP 出包产物（Il2CppOutputProject），空工程首次调用必然失败 |
+
+结论：**"包安装 + 热更程序集切分 + hotUpdateAssemblies 配置"已可复跑**；
+`link.xml` / `AOTGenericReferences.cs` / 方法桥需要以"先 IL2CPP 出包一次"为前提，
+因此下一步是 IL2CPP 出包（`AIFW_IL2CPP=1` 走 `BuildPlayer.BuildWindows`），再回到 GenerateAll。

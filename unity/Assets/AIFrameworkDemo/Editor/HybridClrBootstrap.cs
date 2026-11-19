@@ -46,6 +46,117 @@ namespace AIFramework.Demo.Editor
             Debug.Log("[HybridCLR] 自检退出码=" + exitCode);
         }
 
+        [MenuItem("AIFramework/HybridCLR/配置热更程序集并生成元数据", priority = 52)]
+        public static void ConfigureHotUpdateFromMenu()
+        {
+            int exitCode = ConfigureHotUpdateAssembly();
+            EditorUtility.DisplayDialog(
+                "HybridCLR",
+                exitCode == 0 ? "热更程序集配置与元数据生成完成，详见 Console。" : "配置失败（退出码 " + exitCode + "），详见 Console。",
+                "好");
+        }
+
+        /// <summary>
+        /// 把 <c>AIFramework.HotUpdate</c> 写进 HybridCLRSettings.hotUpdateAssemblies，并生成 AOT 元数据
+        /// （link.xml / AOTGenericReferences / il2cpp def / 方法桥）。
+        /// <para>
+        /// 用 SerializedObject 而不是反射字段：HybridCLR 的 Settings 字段名稳定在序列化层，
+        /// 但 C# 可见性会随版本变（v9 的公开属性只有 name/hideFlags），走序列化最不容易被版本升级打穿。
+        /// </para>
+        /// </summary>
+        public static int ConfigureHotUpdateAssembly()
+        {
+            const string settingsDir = "Assets/HybridCLRGenerate";
+            const string settingsPath = settingsDir + "/HybridCLRSettings.asset";
+            const string hotUpdateAssembly = "AIFramework.HotUpdate";
+
+            Type? settingsType = FindType("HybridCLR.Settings.HybridCLRSettings");
+            if (settingsType == null)
+            {
+                Debug.LogError("[HybridCLR] 找不到 HybridCLR.Settings.HybridCLRSettings，包未解析？");
+                return 2;
+            }
+
+            if (!AssetDatabase.IsValidFolder(settingsDir))
+            {
+                AssetDatabase.CreateFolder("Assets", "HybridCLRGenerate");
+            }
+
+            ScriptableObject? settings = AssetDatabase.LoadAssetAtPath<ScriptableObject>(settingsPath);
+            if (settings == null)
+            {
+                settings = ScriptableObject.CreateInstance(settingsType);
+                AssetDatabase.CreateAsset(settings, settingsPath);
+                Debug.Log("[HybridCLR] 已创建 " + settingsPath);
+            }
+
+            var serialized = new SerializedObject(settings);
+            SerializedProperty? listProperty = serialized.FindProperty("hotUpdateAssemblies");
+            if (listProperty == null)
+            {
+                Debug.LogError("[HybridCLR] 设置里没有 hotUpdateAssemblies 字段，版本不匹配（当前包可能不是 v9.x）。");
+                return 3;
+            }
+
+            bool found = false;
+            for (int i = 0; i < listProperty.arraySize; i++)
+            {
+                if (listProperty.GetArrayElementAtIndex(i).stringValue == hotUpdateAssembly)
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                int index = listProperty.arraySize;
+                listProperty.InsertArrayElementAtIndex(index);
+                listProperty.GetArrayElementAtIndex(index).stringValue = hotUpdateAssembly;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(settings);
+                AssetDatabase.SaveAssets();
+                Debug.Log("[HybridCLR] hotUpdateAssemblies += " + hotUpdateAssembly);
+            }
+            else
+            {
+                Debug.Log("[HybridCLR] hotUpdateAssemblies 已包含 " + hotUpdateAssembly + "（幂等）");
+            }
+
+            Type? prebuild = FindType("HybridCLR.Commands.PrebuildCommand");
+            MethodInfo? generateAll = prebuild?.GetMethod("GenerateAll", BindingFlags.Public | BindingFlags.Static);
+            if (generateAll == null)
+            {
+                Debug.LogError("[HybridCLR] 找不到 PrebuildCommand.GenerateAll()，跳过元数据生成。");
+                return 4;
+            }
+
+            try
+            {
+                generateAll.Invoke(null, null);
+                Debug.Log("[HybridCLR] PrebuildCommand.GenerateAll() 完成");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HybridCLR] GenerateAll 失败：" + (ex.InnerException ?? ex));
+                return 5;
+            }
+
+            bool linkXml = File.Exists(Path.Combine(Application.dataPath, "link.xml"));
+            bool aotRefs = File.Exists(Path.Combine(Application.dataPath, "AOTGenericReferences.cs"));
+            string generated = Path.Combine(Application.dataPath, "HybridCLRGenerate");
+            Debug.Log("[HybridCLR] link.xml=" + linkXml + " AOTGenericReferences.cs=" + aotRefs
+                + " settings=OK generatedDir=" + Directory.Exists(generated));
+
+            if (!linkXml || !aotRefs)
+            {
+                Debug.LogError("[HybridCLR] 元数据产物不完整（link.xml / AOTGenericReferences.cs 缺一），请查看 Unity 日志。");
+                return 6;
+            }
+
+            return 0;
+        }
+
         /// <summary>供 batchmode 调用：打印诊断 → 安装（幂等）→ 再自检。返回 0 表示通过。</summary>
         public static int InstallAndVerify()
         {
