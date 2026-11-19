@@ -40,6 +40,9 @@ namespace AIFramework.Demo.Editor
             RunnerSceneBuilder.CreateRunnerScene();
             PlatformerSceneBuilder.CreatePlatformerScene();
             RoguelikeSceneBuilder.CreateRoguelikeScene();
+            BoardGameSceneBuilder.CreateBoardGameScene();
+            TycoonSceneBuilder.CreateTycoonScene();
+            IdleRpgSceneBuilder.CreateIdleRpgScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），

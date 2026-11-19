@@ -101,6 +101,9 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, RunnerScenePath);
             AddIfSceneExists(scenes, PlatformerScenePath);
             AddIfSceneExists(scenes, RoguelikeScenePath);
+            AddIfSceneExists(scenes, BoardGameScenePath);
+            AddIfSceneExists(scenes, TycoonScenePath);
+            AddIfSceneExists(scenes, IdleRpgScenePath);
             AddIfSceneExists(scenes, DemoScenePath);
 
             if (scenes.Count == 0)
@@ -186,6 +189,15 @@ namespace AIFramework.Demo.Editor
 
         /// <summary>肉鸽卡牌场景路径。</summary>
         private const string RoguelikeScenePath = "Assets/AIFrameworkDemo/Scenes/RoguelikeScene.unity";
+
+        /// <summary>棋类场景路径。</summary>
+        private const string BoardGameScenePath = "Assets/AIFrameworkDemo/Scenes/BoardGameScene.unity";
+
+        /// <summary>模拟经营场景路径。</summary>
+        private const string TycoonScenePath = "Assets/AIFrameworkDemo/Scenes/TycoonScene.unity";
+
+        /// <summary>挂机 RPG 场景路径。</summary>
+        private const string IdleRpgScenePath = "Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity";
 
         /// <summary>Realtime 最小演示场景路径。</summary>
         private const string DemoScenePath = "Assets/AIFrameworkDemo/Scenes/DemoScene.unity";

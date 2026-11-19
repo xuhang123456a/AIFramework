@@ -45,6 +45,8 @@ namespace AIFramework.Fixtures
                 WriteMergeItem(target);
                 WriteLocalization(target);
                 WriteTower(target);
+                WriteTycoonBuilding(target);
+                WriteIdleStage(target);
                 Console.WriteLine("已生成夹具：" + Path.GetFullPath(target));
             }
 
@@ -164,6 +166,52 @@ namespace AIFramework.Fixtures
                 writer.Write(cost);
                 writer.Write(damage);
                 writer.Write(range);
+            });
+        }
+
+        private static void WriteTycoonBuilding(string directory)
+        {
+            // TbTycoonBuilding: row{buildingId, kind, buildCost, baseIncome, maxLevel} —— 20 字节/行
+            // （模拟经营切片 Feature.Tycoon 的子表；kind: 0 摊位 / 1 商店 / 2 餐厅）
+            var rows = new List<(int BuildingId, int Kind, int BuildCost, int BaseIncome, int MaxLevel)>
+            {
+                (1, 0, 100, 5, 5),
+                (2, 1, 300, 12, 5),
+                (3, 2, 800, 30, 3)
+            };
+
+            WriteTable(Path.Combine(directory, "TbTycoonBuilding.bin"), rows.Count, (writer, index) =>
+            {
+                (int buildingId, int kind, int buildCost, int baseIncome, int maxLevel) = rows[index];
+                writer.Write(buildingId);
+                writer.Write(kind);
+                writer.Write(buildCost);
+                writer.Write(baseIncome);
+                writer.Write(maxLevel);
+            });
+        }
+
+        private static void WriteIdleStage(string directory)
+        {
+            // TbIdleStage: row{stageId, enemyHp, enemyAttack, goldReward, requiredPower} —— 20 字节/行
+            // （挂机 RPG 切片 Feature.IdleRpg 的子表；stageId 必须从 1 起逐行连续）
+            var rows = new List<(int StageId, int EnemyHp, int EnemyAttack, int GoldReward, int RequiredPower)>
+            {
+                (1, 30, 2, 20, 10),
+                (2, 60, 4, 40, 16),
+                (3, 120, 6, 80, 28),
+                (4, 240, 9, 160, 46),
+                (5, 480, 12, 320, 70)
+            };
+
+            WriteTable(Path.Combine(directory, "TbIdleStage.bin"), rows.Count, (writer, index) =>
+            {
+                (int stageId, int enemyHp, int enemyAttack, int goldReward, int requiredPower) = rows[index];
+                writer.Write(stageId);
+                writer.Write(enemyHp);
+                writer.Write(enemyAttack);
+                writer.Write(goldReward);
+                writer.Write(requiredPower);
             });
         }
 

@@ -7,11 +7,11 @@ namespace UnityEngine
     /// <summary>UnityEngine.Events.UnityEvent 的精简桩（本仓只用无参 onClick）。</summary>
     public class UnityEvent
     {
-        public void AddListener(Action call)
+        public void AddListener(UnityEngine.Events.UnityAction call)
         {
         }
 
-        public void RemoveListener(Action call)
+        public void RemoveListener(UnityEngine.Events.UnityAction call)
         {
         }
 
@@ -19,6 +19,13 @@ namespace UnityEngine
         {
         }
     }
+}
+
+namespace UnityEngine.Events
+{
+    /// <summary>UnityEvent 的委托类型（形状桩）：真实 Unity 里 <c>UnityEvent.AddListener</c> 只收它，
+    /// 不收 <see cref="System.Action"/>——这条差异曾让"传 Action 变量"的代码在桩里通过、真 Unity 编译失败。</summary>
+    public delegate void UnityAction();
 }
 
 namespace UnityEngine.UI

@@ -119,6 +119,24 @@ namespace AIFramework.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator BoardGameScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<BoardGameController>("BoardGameScene");
+        }
+
+        [UnityTest]
+        public IEnumerator TycoonScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<TycoonPanelController>("TycoonScene");
+        }
+
+        [UnityTest]
+        public IEnumerator IdleRpgScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<IdleRpgPanelController>("IdleRpgScene");
+        }
+
+        [UnityTest]
         public IEnumerator DemoScene_Loads_AndRuns_WithoutErrors()
         {
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");
