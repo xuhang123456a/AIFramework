@@ -7,9 +7,11 @@ using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
+using AIFramework.Core.Services;
 using AIFramework.Features.Achievement;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
+using AIFramework.Features.Guide;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
 using AIFramework.Features.SeasonPass;
@@ -80,6 +82,8 @@ namespace AIFramework.Adapters.Console
             WireInventory();
             WireAchievement();
             WireSeasonPass();
+            WireGuide();
+            RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
 
             _writer.WriteLine("今天天序号=" + signIn.TodayDayIndex + "，初始道具=" + DescribeInventory());
@@ -301,6 +305,45 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>新手引导接线：表驱动步骤机；外部事实（进大厅/开商店/完成战斗）由适配层翻译成 trigger。</summary>
+        private void WireGuide()
+        {
+            var guide = new GuideHandler(_bus, _tables);
+            guide.Register(_bus);
+
+            // 演示四个触发点：启动 → 进大厅 → 打开商店 → 完成一场战斗。
+            _bus.Send(new GuideTriggerCommand(0, 0));
+            _bus.Send(new GuideAdvanceCommand(1));
+            _bus.Send(new GuideTriggerCommand(1, 0));
+            _bus.Send(new GuideAdvanceCommand(2));
+            _bus.Send(new GuideTriggerCommand(2, 0));
+
+            GuideSnapshot snapshot = _bus.Query<GuideQueryRequest, GuideSnapshot>(new GuideQueryRequest());
+            _writer.WriteLine("[Guide] 当前=" + snapshot.StepId + "(" + snapshot.Title + ")"
+                + " 已到条件=" + snapshot.Reached
+                + " 进度=" + snapshot.CompletedCount + "/" + snapshot.TotalCount
+                + " 完成=" + snapshot.IsCompleted);
+        }
+
+        /// <summary>商店 → IAP → 发货 → 埋点闭环冒烟（假商店，不发真实货币）。</summary>
+        private void RunStorePurchaseSmoke()
+        {
+            var analytics = new ConsoleAnalyticsService(new System.IO.StringWriter());
+            var flow = new ConsoleStorePurchaseFlow(_bus, analytics);
+
+            StorePurchaseOutcome gold = flow.Buy(ConsoleIapService.ProductGold60);
+            StorePurchaseOutcome goldAgain = flow.Buy(ConsoleIapService.ProductGold60);
+            StorePurchaseOutcome noAds = flow.Buy(ConsoleIapService.ProductNoAds);
+            StorePurchaseOutcome noAdsAgain = flow.Buy(ConsoleIapService.ProductNoAds);
+            int restored = flow.Restore();
+
+            _writer.WriteLine(
+                "[Shop/IAP] 金币=" + gold.Granted + "(" + gold.ItemId + "x" + gold.Count + ")"
+                + " 再买=" + goldAgain.Granted + "(" + goldAgain.Reason + ")"
+                + " 去广告=" + noAds.Granted + " 重复=" + noAdsAgain.Granted + "(" + noAdsAgain.Reason + ")"
+                + " 恢复=" + restored + " 埋点=" + analytics.AcceptedCount);
+        }
+
         /// <summary>赛季通行证接线：战斗结算经验由适配层桥接注入（切片间不互相引用）。</summary>
         private void WireSeasonPass()
         {

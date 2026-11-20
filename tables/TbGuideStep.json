@@ -1,0 +1,23 @@
+{
+  "table": "TbGuideStep",
+  "columns": [
+    { "name": "stepId", "type": "int32" },
+    { "name": "title", "type": "string" },
+    { "name": "hint", "type": "string" },
+    { "name": "trigger", "type": "int32" },
+    { "name": "targetId", "type": "int32" },
+    { "name": "skippable", "type": "int32" }
+  ],
+  "rows": [
+    { "stepId": 1, "title": "欢迎", "hint": "点击开始按钮进入游戏", "trigger": 0, "targetId": 0, "skippable": 0 },
+    { "stepId": 2, "title": "进入大厅", "hint": "点击大厅按钮切换到大厅", "trigger": 1, "targetId": 0, "skippable": 0 },
+    { "stepId": 3, "title": "打开商店", "hint": "点击大厅里的商店入口", "trigger": 2, "targetId": 0, "skippable": 1 },
+    { "stepId": 4, "title": "完成一场战斗", "hint": "进入战斗并打完一局", "trigger": 3, "targetId": 0, "skippable": 1 },
+    { "stepId": 5, "title": "领取签到奖励", "hint": "打开签到面板领取今日奖励", "trigger": 4, "targetId": 0, "skippable": 1 },
+    { "stepId": 6, "title": "升到 5 级", "hint": "继续对战升到 5 级", "trigger": 5, "targetId": 5, "skippable": 1 },
+    { "stepId": 7, "title": "购买商品 2001", "hint": "在商店购买商品 2001", "trigger": 2, "targetId": 2001, "skippable": 1 },
+    { "stepId": 8, "title": "再战一场", "hint": "再打完一局战斗", "trigger": 3, "targetId": 0, "skippable": 1 },
+    { "stepId": 9, "title": "回到大厅", "hint": "战斗结束后回到大厅", "trigger": 1, "targetId": 0, "skippable": 1 },
+    { "stepId": 10, "title": "领取第 7 天签到", "hint": "连续签到第 7 天并领取奖励", "trigger": 4, "targetId": 7, "skippable": 1 }
+  ]
+}

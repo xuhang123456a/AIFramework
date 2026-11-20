@@ -131,6 +131,9 @@ namespace AIFramework.Tests.EditMode
             // 赛季通行证：TbSeasonPass.bin 必须装配成功（表缺失会被静默降级）。
             Assert.IsTrue(host.SeasonPassAvailable, "赛季通行证缺表：TbSeasonPass.bin。");
 
+            // 新手引导：TbGuideStep.bin 必须装配成功。
+            Assert.IsTrue(host.GuideAvailable, "新手引导缺表：TbGuideStep.bin。");
+
             // 广告端口：未接真实 SDK 时必须如实不可用。
             Assert.IsFalse(host.Ads.IsAvailable, "广告端口未接 SDK，IsAvailable 必须是 false。");
 

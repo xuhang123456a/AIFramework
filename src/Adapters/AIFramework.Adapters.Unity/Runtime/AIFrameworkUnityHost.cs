@@ -16,6 +16,7 @@ using AIFramework.Core.Save;
 using AIFramework.Core.Ui;
 using AIFramework.Features.Achievement;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Guide;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
@@ -119,6 +120,29 @@ namespace AIFramework.Adapters.Unity
         private AchievementHandler? _achievements;
 
         private SeasonPassHandler? _seasonPass;
+
+        private GuideHandler? _guide;
+
+        /// <summary>新手引导是否装配成功（表缺失时降级为 false，不影响启动）。</summary>
+        public bool GuideAvailable
+        {
+            get { return _guide != null; }
+        }
+
+        /// <summary>新手引导查询入口；未装配时抛 <see cref="InvalidOperationException"/>。</summary>
+        public GuideHandler Guide
+        {
+            get
+            {
+                GuideHandler? current = _guide;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("新手引导尚未装配成功（TbGuideStep.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
+        }
 
         /// <summary>赛季通行证是否装配成功（表缺失时降级为 false，不影响启动）。</summary>
         public bool SeasonPassAvailable
@@ -520,6 +544,24 @@ namespace AIFramework.Adapters.Unity
             {
                 _seasonPass = null;
                 _logger.Error("赛季通行证装配失败（TbSeasonPass.bin 缺失或损坏），已跳过：" + exception.Message);
+            }
+        }
+        // 新手引导：表缺失降级；触发/推进由 UI 层发命令（切片间不互相引用）。
+        if (_guide == null)
+        {
+            try
+            {
+                var guide = new GuideHandler(_bus, _tableLoader);
+                guide.Register(_bus);
+                _guide = guide;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _guide = null;
+                _logger.Error("新手引导装配失败（TbGuideStep.bin 缺失或损坏），已跳过：" + exception.Message);
             }
         }
         if (_mails == null)
