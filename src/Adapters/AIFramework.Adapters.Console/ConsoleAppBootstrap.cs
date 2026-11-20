@@ -6,6 +6,7 @@ using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
+using AIFramework.Contracts.Services;
 using AIFramework.Core.Meta;
 using AIFramework.Core.Replay;
 using AIFramework.Core.Services;
@@ -13,7 +14,9 @@ using AIFramework.Features.Achievement;
 using AIFramework.Features.ActivitySchedule;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
+using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
+using AIFramework.Features.Localization;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
 using AIFramework.Features.SeasonPass;
@@ -86,6 +89,9 @@ namespace AIFramework.Adapters.Console
             WireSeasonPass();
             WireGuide();
             WireActivitySchedule();
+            WireErrorToast();
+            WireAccount();
+            WireExperiment();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -309,6 +315,58 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>账号接线：游客静默登录 + 会话 TTL 过期演示（假后端，不联网）。</summary>
+        private void WireAccount()
+        {
+            var accounts = new ConsoleAccountService(_time);
+            var session = new AccountSessionManager(accounts, _time);
+            AccountLoginOutcome signIn = session.EnsureSignedIn();
+            session.TryGetAccount(out AccountInfo info);
+            AccountLoginOutcome again = session.EnsureSignedIn();
+
+            _writer.WriteLine("[Account] 登录=" + signIn.IsSuccess + " 玩家=" + info.PlayerId
+                + " 类型=" + info.Kind + " 重复登录=" + again.Result + " 状态=" + session.State);
+        }
+
+        /// <summary>A/B 实验接线：按玩家 id 确定性分桶并曝光（同一玩家只曝光一次）。</summary>
+        private void WireExperiment()
+        {
+            var experiment = new ExperimentHandler(_bus, _tables);
+            experiment.Register(_bus);
+            _bus.Send(new ExperimentEvaluateCommand(10001));
+
+            ExperimentSnapshot first = _bus.Query<ExperimentQueryRequest, ExperimentSnapshot>(new ExperimentQueryRequest());
+            _bus.Send(new ExperimentEvaluateCommand(10001));
+            ExperimentSnapshot second = _bus.Query<ExperimentQueryRequest, ExperimentSnapshot>(new ExperimentQueryRequest());
+
+            string sample = first.Assignments.Count > 0
+                ? first.Assignments[0].Key + "=" + first.Assignments[0].Variant
+                : "空表";
+            _writer.WriteLine("[Experiment] 分桶=" + first.Assignments.Count + " 示例=" + sample
+                + " 曝光=" + first.ExposedCount + " 重复曝光后=" + second.ExposedCount);
+        }
+
+        /// <summary>
+        /// 错误码 → 本地化 → Toast 统一链路：业务只上报错误码，文案与级别由目录决定。
+        /// 这里顺带把本地化处理器装上，验证"有翻译用翻译、缺翻译回退兜底"两条路径都真实生效。
+        /// </summary>
+        private void WireErrorToast()
+        {
+            var localization = new LocalizationHandler(_bus, _tables);
+            localization.Register(_bus);
+
+            var presenter = new ConsoleToastPresenter(_writer);
+            var router = new ErrorToastRouter(_bus, presenter);
+
+            string balance = router.Route(3004);
+            string network = router.Route(1001);
+            string claimed = router.Route(5003);
+            string unknown = router.Route(999999);
+
+            _writer.WriteLine("[Toast] 共=" + presenter.ShownCount + " 条，兜底=" + router.FallbackCount
+                + " 未知码=" + router.UnknownCodeCount + "；示例=" + balance + " / " + network + " / " + claimed);
+        }
+
         /// <summary>活动轮换接线：排期由表驱动，tick 由时间源推动（这里只跑一次演示）。</summary>
         private void WireActivitySchedule()
         {

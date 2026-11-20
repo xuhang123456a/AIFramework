@@ -73,9 +73,6 @@ namespace AIFramework.Demo.Editor
         /// <summary>EditorPrefs：行优先字符网格（顶部在前）。</summary>
         private const string PrefTiles = "AIFramework.GridLevelEditor.Tiles";
 
-        /// <summary>白色（用于恢复 <see cref="GUI.backgroundColor"/>；不依赖 <c>Color.white</c> 桩）。</summary>
-        private static readonly Color DefaultBackground = new Color(1f, 1f, 1f, 1f);
-
         /// <summary>关卡 id（完整形态，例如 <c>puzzle-demo</c>）。</summary>
         private string _id = PuzzleLevelJson.DemoId;
 
@@ -224,14 +221,20 @@ namespace AIFramework.Demo.Editor
             SaveState();
         }
 
-        /// <summary>清空：回到"四周是墙、内部是空地"的空白画布（<b>不是</b>全空地——那必然过不了边界墙校验）。</summary>
+        /// <summary>
+        /// 清空：回到"四周是墙、内部是空地"的空白画布（<b>不是</b>全空地——那必然过不了边界墙校验）。
+        /// <b>不弹窗</b>：清空是高频的草稿操作，每次都拦一个模态框会把画关卡变成点确认对话框。
+        /// </summary>
         private void ClearGrid()
         {
             _width = DefaultSide;
             _height = DefaultSide;
             _tiles = CreateBlankTiles(_width, _height);
             SaveState();
-            PublishReport(true, "已清空为 " + _width + "×" + _height + " 空白画布（四周墙 + 内部空地）。", null);
+
+            _report = "已清空为 " + _width + "×" + _height + " 空白画布（四周墙 + 内部空地）。";
+            _reportType = MessageType.Info;
+            Debug.Log(LogPrefix + _report);
         }
 
         /// <summary>

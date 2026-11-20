@@ -99,7 +99,10 @@ namespace AIFramework.TableCheck
                     case "TbTycoonBuilding":
                         CheckBuilding(pair.Key, pair.Value, issues);
                         break;
-                    case "TbIdleStage":
+                    case "TbExperiment":
+                    CheckExperiment(pair.Value, issues);
+                    break;
+                case "TbIdleStage":
                         CheckIdleStage(pair.Value, issues);
                         break;
                     default:
@@ -266,6 +269,66 @@ namespace AIFramework.TableCheck
             }
         }
 
+        /// <summary>
+        /// A/B 实验：主键唯一、key 唯一非空、流量 0..100、enabled 只能 0/1。
+        /// <para>
+        /// <b>为什么这些必须拦</b>：trafficPercent 越界会让分桶静默退化（比如 150 变成"全 B"、
+        /// -1 变成"全 A"），enabled 写成 2 会被客户端当"启用"而服务端当"禁用"，两边分组直接分叉。
+        /// </para>
+        /// </summary>
+        private static void CheckExperiment(TableData table, List<TableIssue> issues)
+        {
+            CheckUniqueIntColumn(table, "experimentId", issues);
+            CheckUniqueStringColumn(table, "key", issues);
+
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                int? traffic = GetInt(table, i, "trafficPercent");
+                if (traffic.HasValue && (traffic.Value < 0 || traffic.Value > 100))
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "trafficPercent",
+                        "B 组流量必须在 0..100（越界会让分桶静默退化）"));
+                }
+
+                int? enabled = GetInt(table, i, "enabled");
+                if (enabled.HasValue && enabled.Value != 0 && enabled.Value != 1)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "enabled", "enabled 只能是 0/1"));
+                }
+
+                int? variantA = GetInt(table, i, "variantA");
+                int? variantB = GetInt(table, i, "variantB");
+                if (variantA.HasValue && variantB.HasValue && variantA.Value == variantB.Value)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "variantB",
+                        "variantA 与 variantB 相同（实验无差异，确认是否有意为之）"));
+                }
+
+                string? key = GetString(table, i, "key");
+                if (key != null && key.Length == 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "key", "key 不能为空（分桶哈希依赖它）"));
+                }
+            }
+        }
+        /// <summary>字符串列唯一性（空值跳过，空值由各表自己的规则判）。</summary>
+        private static void CheckUniqueStringColumn(TableData table, string columnName, List<TableIssue> issues)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                string? value = GetString(table, i, columnName);
+                if (string.IsNullOrEmpty(value))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(value!))
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, columnName, "值重复：" + value));
+                }
+            }
+        }
         private static void CheckLocalization(TableData table, List<TableIssue> issues)
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);

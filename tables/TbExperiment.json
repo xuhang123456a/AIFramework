@@ -1,0 +1,19 @@
+{
+  "table": "TbExperiment",
+  "columns": [
+    { "name": "experimentId", "type": "int32" },
+    { "name": "key", "type": "string" },
+    { "name": "variantA", "type": "int32" },
+    { "name": "variantB", "type": "int32" },
+    { "name": "trafficPercent", "type": "int32" },
+    { "name": "enabled", "type": "int32" }
+  ],
+  "rows": [
+    { "experimentId": 1, "key": "ui.new_shop", "variantA": 0, "variantB": 1, "trafficPercent": 50, "enabled": 1 },
+    { "experimentId": 2, "key": "balance.gold_rate", "variantA": 1, "variantB": 2, "trafficPercent": 30, "enabled": 1 },
+    { "experimentId": 3, "key": "feature.battle_speed", "variantA": 1, "variantB": 2, "trafficPercent": 20, "enabled": 1 },
+    { "experimentId": 4, "key": "feature.auto_battle", "variantA": 0, "variantB": 1, "trafficPercent": 10, "enabled": 1 },
+    { "experimentId": 5, "key": "ui.hud_compact", "variantA": 0, "variantB": 1, "trafficPercent": 0, "enabled": 1 },
+    { "experimentId": 6, "key": "event.anniversary_theme", "variantA": 0, "variantB": 1, "trafficPercent": 100, "enabled": 0 }
+  ]
+}

@@ -134,6 +134,11 @@ namespace AIFramework.Tests.EditMode
             // 新手引导：TbGuideStep.bin 必须装配成功。
             Assert.IsTrue(host.GuideAvailable, "新手引导缺表：TbGuideStep.bin。");
 
+            // A/B 实验表必须装配成功；账号会话必须能静默登录（假后端）。
+            Assert.IsTrue(host.ExperimentAvailable, "A/B 实验缺表：TbExperiment.bin。");
+            Assert.IsTrue(host.Account.EnsureSignedIn().IsSuccess, "游客静默登录应成功。");
+            Assert.IsNotNull(host.ToastPresenter, "Toast 表现层必须已装配。");
+
             // 广告端口：未接真实 SDK 时必须如实不可用。
             Assert.IsFalse(host.Ads.IsAvailable, "广告端口未接 SDK，IsAvailable 必须是 false。");
 

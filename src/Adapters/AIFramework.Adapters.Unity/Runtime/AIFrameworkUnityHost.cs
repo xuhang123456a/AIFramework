@@ -12,10 +12,12 @@ using AIFramework.Contracts.Ui;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
+using AIFramework.Core.Services;
 using AIFramework.Core.Save;
 using AIFramework.Core.Ui;
 using AIFramework.Features.Achievement;
 using AIFramework.Features.DailySignIn;
+using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Localization;
@@ -96,6 +98,14 @@ namespace AIFramework.Adapters.Unity
         private readonly UnityIapService _iap;
 
         private readonly UnityAudioService _audio;
+
+        private readonly UnityToastPresenter _toastPresenter;
+
+        private readonly ErrorToastRouter _toastRouter;
+
+        private readonly AccountSessionManager _accountSession;
+
+        private readonly ExperimentHandler? _experiment;
 
         private readonly UnityAdService _ads;
 
@@ -248,10 +258,27 @@ namespace AIFramework.Adapters.Unity
             _ads = new UnityAdService(_time, available: false);
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
 
+
             // 工厂要拿表加载器组卡牌，所以它必须在表加载器之后构造。
             _factory = new UnityKernelFactory(_spatial, UnityKernelFactory.CreateDefaultPhases(), _tableLoader);
             _sessions = new GameplaySessionHost(_factory);
             _bus = new CqeBus();
+            try
+            {
+                var experiment = new ExperimentHandler(_bus, _tableLoader);
+                experiment.Register(_bus);
+                _experiment = experiment;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _experiment = null;
+                _logger.Error("A/B 实验装配失败（TbExperiment.bin 缺失或损坏），已跳过：" + exception.Message);
+            }            _toastPresenter = new UnityToastPresenter(_logger);
+            _toastRouter = new ErrorToastRouter(_bus, _toastPresenter);
+            _accountSession = new AccountSessionManager(new UnityAccountService(_storage, _time, available: true), _time);
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _popups = new PopupQueue();
@@ -333,6 +360,45 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>账号会话（游客静默登录 + TTL 过期；Phase 1 由本地模拟后端提供）。</summary>
+        public AccountSessionManager Account
+        {
+            get { return _accountSession; }
+        }
+
+        /// <summary>A/B 实验是否装配成功（表缺失时降级为 false）。</summary>
+        public bool ExperimentAvailable
+        {
+            get { return _experiment != null; }
+        }
+
+        /// <summary>A/B 实验查询入口；未装配时抛 <see cref="InvalidOperationException"/>。</summary>
+        public ExperimentHandler Experiment
+        {
+            get
+            {
+                ExperimentHandler? current = _experiment;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("A/B 实验尚未装配成功（TbExperiment.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
+        }
+
+        /// <summary>Toast 表现层（Phase 1 落日志；接入真实 UI 时只替换实现）。</summary>
+        public UnityToastPresenter ToastPresenter
+        {
+            get { return _toastPresenter; }
+        }
+
+        /// <summary>错误码 → 本地化 → Toast 路由（业务侧上报错误码即可，不要自己拼文案）。</summary>
+        public ErrorToastRouter ToastRouter
+        {
+            get { return _toastRouter; }
         }
 
         /// <summary>音频服务（全局共享一个实例：多场景并存时不应各自建一套音源与音量写入）。</summary>

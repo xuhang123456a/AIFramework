@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using AIFramework.Kernel.Turn.Puzzle;
 using System.Collections.Generic;
+using AIFramework.Kernel.Turn.Puzzle;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Gameplay.Turn;
 using AIFramework.Contracts.Meta;
@@ -18,9 +18,20 @@ namespace AIFramework.Adapters.Unity.Battle
     /// 按 <see cref="autoStepSeconds"/> 间隔驱动内置解法、结算并广播事实、把只读视图推给 HUD。
     /// </para>
     /// <para>
-    /// <b>为什么只认 Contracts 接口</b>：本类<b>不</b>引用 <c>AIFramework.Kernel.Turn</c> 的
-    /// <c>PuzzleWorld</c>，只用 <see cref="IPuzzleReadView"/> / <see cref="IPuzzleInput"/> 与
-    /// <see cref="IGameplaySession"/>；内核实现与宿主工厂分支由装配层接，本类无需改动。
+    /// <b>为什么只在"建外部关卡"这一处碰内核具体类型</b>：<see cref="GameplayInitData"/> 只带
+    /// <see cref="GameplayInitData.LevelId"/> 与种子，<c>IGameplayKernelFactory</c> 没有"把布局传进去"的参数，
+    /// 所以编辑器/配置表导出的关卡只能由本类直接
+    /// <c>new PuzzleWorld(init, rows, source)</c> 建出来（<b>唯一的</b>内核具体类型引用）。
+    /// 换关、推演、结算、渲染仍只走 <see cref="IGameplaySession"/> / <see cref="IPuzzleReadView"/> /
+    /// <see cref="IPuzzleInput"/>。工厂一旦支持透传行数组，这里应改回 <c>host.Sessions.Begin</c>——
+    /// 这是本任务的架构债，已在交付报告里写明。
+    /// </para>
+    /// <para>
+    /// <b>外部关卡为什么不进 host.Sessions</b>：宿主会话表只认 <see cref="GameplayInitData"/>，外部关卡没有
+    /// 能交给工厂的载荷，因此由本控制器直接持有会话（<c>_directSession</c>）。代价是这段时间
+    /// <c>host.Sessions.HasActiveSession == false</c>，结算也必须由本类直接
+    /// <see cref="IGameplaySession.CollectResult"/>（<see cref="Finish"/> 已按该标记分流），
+    /// 不能走 <c>EndAndCollect</c>——否则会抛"没有活跃会话"，通关奖励与 <c>GameFinishedEvent</c> 全部丢失。
     /// </para>
     /// <para>
     /// <b>为什么用 <see cref="Update"/> 计时而不是协程</b>：宪法禁止把业务节奏挂到 <c>IEnumerator</c> /
@@ -30,16 +41,9 @@ namespace AIFramework.Adapters.Unity.Battle
     /// <para>
     /// <b>关卡 JSON（T5-9）</b>：<see cref="Awake"/> 里先按 <see cref="puzzleDataFile"/>（可配）→
     /// <c>Levels/puzzle-&lt;levelId&gt;</c> → <c>Levels/puzzle-demo</c> 的顺序找
-    /// <c>Resources</c> 下的关卡 JSON，解析并校验（格式见 <see cref="PuzzleLevelJson"/>），
-    /// 把摘要写进日志；<b>缺失或非法一律 <c>Log.Warn</c> 并回退内置关卡，绝不让玩法崩</b>。
-    /// </para>
-    /// <para>
-    /// <b>已知缺口（必须写在明处）</b>：开局走 <c>host.Sessions.Begin → UnityKernelFactory</c>，
-    /// 而该工厂的 Puzzle 分支目前只 <c>new PuzzleWorld(in init)</c>（按 <see cref="GameplayInitData.LevelId"/>
-    /// 取内置关卡），<b>没有</b>把外部布局传给内核的通道；工厂不在本任务写范围内。
-    /// 因此本类读到的 JSON 目前只用于<b>数据校验与布局比对</b>（不一致会明确告警），棋盘仍按内置关卡运行。
-    /// 要让它真正驱动棋盘，需要工厂把行数组透传给内核的外部关卡构造，再由本类在
-    /// <c>Begin</c> 之前把 <c>_levelData</c> 交出去；在那之前这里<b>不做</b>任何"看起来像是加载了 JSON"的伪装。
+    /// <c>Resources</c> 下的关卡 JSON，解析并校验（格式见 <see cref="PuzzleLevelJson"/>）。
+    /// 通过 → <b>直接用该布局建会话</b>（见上）；缺失/非法/内核拒绝 → <c>Log.Warn</c> 并回退内置关卡，
+    /// 绝不让玩法崩。
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -60,14 +64,26 @@ namespace AIFramework.Adapters.Unity.Battle
         /// </summary>
         private const int PuzzleUnitCount = 1;
 
+        /// <summary>
+        /// 外部关卡求解的状态预算（BFS 展开上限）。<b>为什么必须有上限</b>：8×8 上三四个箱子的状态空间是百万级，
+        /// 点一次按钮卡死一帧比"解得慢"更糟；超预算就明确告警并跳过自动解法，绝不无限搜。
+        /// </summary>
+        private const int MaxSolverStates = 8000;
+
         /// <summary>第 1 关内置解法：上、上、上（0=上 1=右 2=下 3=左），3 步。</summary>
         private static readonly int[] SolutionLevel1 = { 1, 1, 1 };
 
-        /// <summary>第 2 关内置解法：需要绕到箱子另一侧再推，9 步。</summary>
-        private static readonly int[] SolutionLevel2 = { 2, 1, 1, 0, 3, 0, 3, 0, 0 };
+        /// <summary>
+        /// 第 2 关内置解法：需要绕到箱子另一侧再推，9 步。
+        /// <b>步序由离屏 BFS 复核过</b>（原值 <c>{2,1,1,0,3,0,3,0,0}</c> 会在第 6 步被内核拒绝、解不开本关）。
+        /// </summary>
+        private static readonly int[] SolutionLevel2 = { 2, 1, 1, 0, 3, 2, 3, 0, 0 };
 
-        /// <summary>第 3 关内置解法：两个箱子两个目标点，9 步。</summary>
-        private static readonly int[] SolutionLevel3 = { 1, 0, 0, 0, 0, 3, 3, 3, 0 };
+        /// <summary>
+        /// 第 3 关内置解法：两个箱子两个目标点，9 步。
+        /// <b>步序由离屏 BFS 复核过</b>（原值 <c>{1,0,0,0,0,3,3,3,0}</c> 第 5 步就会把箱子推离目标、解不开本关）。
+        /// </summary>
+        private static readonly int[] SolutionLevel3 = { 1, 0, 0, 0, 2, 3, 3, 3, 0 };
 
         /// <summary>解谜皮肤（渲染状态行与字符网格，本类不碰任何 UI 组件）。</summary>
         [SerializeField] private PuzzleHud hud = null!;
@@ -229,14 +245,151 @@ namespace AIFramework.Adapters.Unity.Battle
                 return;
             }
 
-            _solution = SolutionFor(_currentLevel);
+            bool external = _directSession;
+            int[]? solution;
+            if (external)
+            {
+                // 外部关卡不在"内置三关"的解法表里，用内核自身当裁判现求一条（不复制推箱规则）。
+                int explored;
+                solution = TrySolveExternalLevel(out explored);
+                if (solution == null)
+                {
+                    host.Log.Warn("[Puzzle] 外部关卡在 " + MaxSolverStates + " 个状态内没解出来，已跳过自动解：关卡="
+                        + _currentLevel + "，尺寸=" + _readView.Width + "×" + _readView.Height
+                        + "，箱子=" + _readView.BoxCount);
+                    StopAutoSolve();
+                    return;
+                }
+
+                host.Log.Info("[Puzzle] 外部关卡已求出解法：" + solution.Length + " 步（BFS 展开 " + explored + " 个状态）。");
+            }
+            else
+            {
+                solution = SolutionFor(_currentLevel);
+            }
+
+            _solution = solution;
             _solutionIndex = 0;
 
             // 先垫满一个间隔：点完立刻在下一帧走第一步，别让玩家对着静止棋盘等 0.35 秒。
             _autoStepAccumulator = EffectiveAutoStepSeconds();
             _autoSolving = true;
 
-            host.Log.Info("[Puzzle] 自动解法开始：关卡=" + _currentLevel + " 共 " + _solution.Length + " 步，间隔 " + EffectiveAutoStepSeconds() + "s");
+            host.Log.Info("[Puzzle] 自动解法开始：关卡=" + _currentLevel + (external ? "（外部关卡）" : string.Empty)
+                + " 共 " + _solution.Length + " 步，间隔 " + EffectiveAutoStepSeconds() + "s");
+        }
+
+        /// <summary>
+        /// 为<b>外部关卡</b>求一条解：BFS，但每一步的合法性都由内核回答
+        /// （<see cref="IPuzzleInput.TryMove"/> 返回 false 即非法），<b>适配层不复制任何推箱规则</b>。
+        /// <para>
+        /// <b>为什么用"重放路径"而不是保存局面快照</b>：<c>PuzzleWorld</c> 没有克隆入口，而
+        /// <see cref="IPuzzleReadView"/> 只读。因此每个节点只保存方向序列，展开前 <c>Reset</c> 再重放；
+        /// 代价是 O(深度) 次重放，对 8×8 小关卡完全够用，且不需要给内核加新接口。
+        /// </para>
+        /// <para>
+        /// <b>为什么去重键是"玩家位置 + 箱子位图"</b>：这两者完全决定局面（地形是静态的、已归位计数由箱子决定），
+        /// 64 格以内正好塞进一个 <see cref="ulong"/>。
+        /// </para>
+        /// </summary>
+        /// <param name="explored">展开的状态数（写日志用）。</param>
+        /// <returns>方向序列；预算内无解返回 <c>null</c>。返回前会把棋盘 <c>Reset</c> 回初始局面。</returns>
+        private int[]? TrySolveExternalLevel(out int explored)
+        {
+            explored = 0;
+            IPuzzleInput? input = _input;
+            IPuzzleReadView? view = _readView;
+            if (input == null || view == null)
+            {
+                return null;
+            }
+
+            if (view.IsSolved)
+            {
+                return Array.Empty<int>();
+            }
+
+            var visited = new HashSet<(int Player, ulong Boxes)>();
+            var queue = new Queue<int[]>();
+            queue.Enqueue(Array.Empty<int>());
+            visited.Add(StateOf(view));
+
+            while (queue.Count > 0 && explored < MaxSolverStates)
+            {
+                int[] path = queue.Dequeue();
+                explored++;
+
+                for (int direction = 0; direction < 4; direction++)
+                {
+                    if (!ReplayAndMove(input, path, direction))
+                    {
+                        continue;
+                    }
+
+                    (int Player, ulong Boxes) state = StateOf(view);
+                    if (!visited.Add(state))
+                    {
+                        continue;
+                    }
+
+                    var next = new int[path.Length + 1];
+                    Array.Copy(path, next, path.Length);
+                    next[path.Length] = direction;
+
+                    if (view.IsSolved)
+                    {
+                        input.Reset();
+                        return next;
+                    }
+
+                    queue.Enqueue(next);
+                }
+            }
+
+            input.Reset();
+            return null;
+        }
+
+        /// <summary>复位后重放 <paramref name="path"/>，再试走一步；返回该步是否被内核接受。</summary>
+        /// <param name="input">输入端口。</param>
+        /// <param name="path">从初始局面出发的方向序列。</param>
+        /// <param name="direction">本步方向（0=上 1=右 2=下 3=左）。</param>
+        /// <returns>该步是否合法。</returns>
+        private static bool ReplayAndMove(IPuzzleInput input, int[] path, int direction)
+        {
+            input.Reset();
+            for (int i = 0; i < path.Length; i++)
+            {
+                if (!input.TryMove(path[i]))
+                {
+                    return false;
+                }
+            }
+
+            return input.TryMove(direction);
+        }
+
+        /// <summary>只读视图 → 搜索去重键（玩家线性下标 + 箱子位图）。</summary>
+        /// <param name="view">解谜只读视图。</param>
+        /// <returns>去重键；只用于 BFS，不参与任何规则判定。</returns>
+        private static (int Player, ulong Boxes) StateOf(IPuzzleReadView view)
+        {
+            ulong boxes = 0;
+            int index = 0;
+            for (int y = 0; y < view.Height; y++)
+            {
+                for (int x = 0; x < view.Width; x++)
+                {
+                    if (view.HasBox(x, y))
+                    {
+                        boxes |= 1UL << index;
+                    }
+
+                    index++;
+                }
+            }
+
+            return ((view.PlayerY * view.Width) + view.PlayerX, boxes);
         }
 
         /// <summary>
@@ -353,7 +506,7 @@ namespace AIFramework.Adapters.Unity.Battle
 
             if (data.Width != view.Width || data.Height != view.Height)
             {
-                host.Log.Warn("[Puzzle] 关卡 JSON 布局尚未生效：内核 PuzzleWorld 只按 LevelId 取内置关卡，"
+                host.Log.Warn("[Puzzle] 关卡 JSON 布局尚未生效：适配层的会话工厂只按 LevelId 建内置关卡的 PuzzleWorld，"
                     + "本次运行内置第 " + _currentLevel + " 关（" + view.Width + "×" + view.Height
                     + "），JSON 是 " + data.Width + "×" + data.Height
                     + "；JSON 仅用于数据校验与编辑器回读。");
@@ -435,6 +588,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _session = null;
             _readView = null;
             _input = null;
+            _directSession = false;
             _collected = true;
 
             AIFrameworkUnityHost? host = _host;
@@ -463,6 +617,10 @@ namespace AIFramework.Adapters.Unity.Battle
 
             StopAutoSolve();
 
+            // 先记下"上一局是不是外部关卡"，再复位标记：顺序反了会让下面的释放分支永远走不到。
+            // 外部关卡不在宿主会话表里，直接丢引用即可（PuzzleWorld 不是 IDisposable，也没有原生资源）。
+            bool previousWasDirect = _directSession;
+
             _currentLevel = level;
             _session = null;
             _readView = null;
@@ -470,13 +628,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _collected = false;
             _directSession = false;
 
-            if (_directSession)
-            {
-                // 外部关卡会话不在宿主会话表里（宿主只认 GameplayInitData），直接丢弃引用即可；
-                // 它不是 IDisposable，也没有原生资源需要释放。
-                _directSession = false;
-            }
-            else if (host.Sessions.HasActiveSession)
+            if (!previousWasDirect && host.Sessions.HasActiveSession)
             {
                 host.Sessions.Release();
             }
@@ -569,13 +721,54 @@ namespace AIFramework.Adapters.Unity.Battle
 
             try
             {
-                return new PuzzleWorld(in init, data.GetRows(), data.Id + ".json");
+                return new PuzzleWorld(in init, ToKernelRows(data.GetRows()), data.Id + ".json");
             }
             catch (ArgumentException exception)
             {
                 host.Log.Warn("[Puzzle] 关卡 JSON 未被内核接受，已回退内置关卡：" + exception.Message);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// JSON 方言 → 内核方言（**这是两套字符约定，必须显式翻译**）。
+        /// <para>
+        /// JSON/编辑器用可读方言：<c>.</c>=空地、<c>O</c>=目标、<c>X</c>=箱子；
+        /// 内核沿用文本关卡约定：空格=空地、<c>.</c>=目标、<c>$</c>=箱子。
+        /// 直接把 JSON 行喂给内核会得到"未知字符"并静默回退内置关卡——这条翻译是数据驱动关卡真生效的关键一步。
+        /// </para>
+        /// </summary>
+        private static string[] ToKernelRows(string[] jsonRows)
+        {
+            var rows = new string[jsonRows.Length];
+            for (int row = 0; row < jsonRows.Length; row++)
+            {
+                string source = jsonRows[row];
+                var chars = new char[source.Length];
+                for (int x = 0; x < source.Length; x++)
+                {
+                    char tile = source[x];
+                    switch (tile)
+                    {
+                        case '.':
+                            chars[x] = ' ';   // 空地
+                            break;
+                        case 'O':
+                            chars[x] = '.';   // 目标
+                            break;
+                        case 'X':
+                            chars[x] = '$';   // 箱子
+                            break;
+                        default:
+                            chars[x] = tile;  // # @ * + 两套约定一致
+                            break;
+                    }
+                }
+
+                rows[row] = new string(chars);
+            }
+
+            return rows;
         }
 
         /// <summary>外部关卡生效后的日志：把"数据驱动关卡真的进了棋盘"写在明处（不是只打印一遍 JSON）。</summary>
@@ -667,7 +860,8 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
-        /// 结算：<c>EndAndCollect</c> → 广播 <c>GameFinishedEvent</c> → 战利品入账 → HUD 显示通关。
+        /// 结算：外部关卡走 <see cref="IGameplaySession.CollectResult"/>、内置关卡走 <c>EndAndCollect</c>，
+        /// 然后广播 <c>GameFinishedEvent</c> → 战利品入账 → HUD 显示通关。
         /// <para>
         /// <b>顺序不可换</b>：先广播"这局已结束"这个事实，再发奖，保证任务/成就类切片看到的结果
         /// 与账本状态一致（反之会读到"已胜利但物品还没到账"的中间态）。
@@ -682,8 +876,11 @@ namespace AIFramework.Adapters.Unity.Battle
             }
 
             // 先置标记再结算：CollectResult 失败（未解出/二次结算）时不允许再重试，否则每帧都会抛一次。
+            // 外部关卡不在宿主会话表里，只能直接向会话要结算；内置关卡仍走 EndAndCollect。
+            IGameplaySession? direct = _directSession ? _session : null;
             _collected = true;
             _session = null;
+            _directSession = false;
             StopAutoSolve();
 
             int moves = Moves;
@@ -691,7 +888,7 @@ namespace AIFramework.Adapters.Unity.Battle
             GameplayResult result;
             try
             {
-                result = host.Sessions.EndAndCollect();
+                result = direct != null ? direct.CollectResult() : host.Sessions.EndAndCollect();
             }
             catch (InvalidOperationException exception)
             {

@@ -47,6 +47,45 @@ namespace AIFramework.TableCheck.Tests
         }
 
         [Fact]
+        public void Experiment_DuplicateKey_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbExperiment",
+                "experimentId,key,variantA,variantB,trafficPercent,enabled",
+                "1,ui.same,0,1,50,1;2,ui.same,0,1,10,1");
+
+            Assert.Contains(issues, issue => issue.Column == "key" && issue.Message.Contains("重复"));
+        }
+
+        [Fact]
+        public void Experiment_TrafficOutOfRange_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbExperiment",
+                "experimentId,key,variantA,variantB,trafficPercent,enabled",
+                "1,ui.bad,0,1,150,1");
+
+            Assert.Contains(issues, issue => issue.Column == "trafficPercent");
+        }
+
+        [Fact]
+        public void Experiment_InvalidEnabledFlag_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbExperiment",
+                "experimentId,key,variantA,variantB,trafficPercent,enabled",
+                "1,ui.bad,0,1,50,2");
+
+            Assert.Contains(issues, issue => issue.Column == "enabled");
+        }
+
+        [Fact]
+        public void Experiment_EqualVariants_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbExperiment",
+                "experimentId,key,variantA,variantB,trafficPercent,enabled",
+                "1,ui.same,7,7,50,1");
+
+            Assert.Contains(issues, issue => issue.Column == "variantB");
+        }
+        [Fact]
         public void Achievement_OutOfRangeMetric_IsReported()
         {
             List<TableIssue> issues = ValidateSingle("TbAchievement",
