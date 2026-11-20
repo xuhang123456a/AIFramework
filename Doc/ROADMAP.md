@@ -174,7 +174,7 @@
 | T9-2 | 服务端契约仿真 | Mock 网关：请求/响应夹具 + 错误注入 | [x] `MockGateway`（规则匹配/后注册优先/超时/服务端错误/畸形响应/调用记录环形）+ `MockRule/MockCallRecord`；61 例；Console 实测 3 类响应 |
 | T9-3 | UI 绑定生成增强 | UIBindNode → ViewBinder 生成器升级（漏绑定即编译错误） | [ ] 未开工（本次收尾停止） |
 | T9-4 | 回放列表 UI | 回放列表页数据 + 播放/删除交互 | [x] `Feature.ReplayBrowser`（分页/三种排序/删除事件/页码越界回退）+ `IReplayArchivePort` + Console 适配；19 例；Console 实测 12 条 3 页、删后剩 11 |
-| T9-5 | 邮件/公告富文本 | 富文本标签白名单 + 安全渲染 | [x] `Feature.RichText`（b/i/u/color/size 白名单、非法剥离+诊断、嵌套上限、往返稳定）；53 例；Console 实测 `<script>` 被剥离 |
+| T9-5 | 邮件/公告富文本 | 富文本标签白名单 + 安全渲染 | [x] `Feature.RichText`（b/i/u/color/size 白名单、非法剥离+诊断、嵌套上限、往返稳定）；54 例；Console 实测 `<script>` 被剥离 |
 | T9-6 | 资源分包清单 | AB/分包清单 + 依赖校验 | [x] `AssetBundleValidator`（重名/重复资源/缺失依赖/循环依赖 = 错误；体积/深度/空包 = 提示）+ 固定 [Bundle] 报告行；18 例；Console 实测 3 分包 6 资源 0 错误 |
 | T9-7 | 埋点校验工具 | 事件号/字段/枚举一致性扫描 | [x] `tools/analyticscheck`：契约常量解析、悬空引用/魔法数字/废弃号/构造参数数；真实仓 9 事件 35 引用 0 错误；43 例；verify-all 第 11 层 |
 | T9-8 | 存档压缩 | 压缩编解码 + 体积回归 | [x] `SaveCompression`（AIFC 头 + Deflate、解压炸弹上限、`ShouldCompress` 阈值、固定 [Compress] 报告行）16 例；Console 实测 504B→295B（58.5%） |

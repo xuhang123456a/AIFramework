@@ -41,9 +41,7 @@ namespace AIFramework.Features.RichText
         private const string ReasonOrphanClose = "孤立闭合标签：没有对应的开标签，已剥离";
         private const string ReasonMismatchClose = "孤立闭合标签：与最近的开标签不匹配，已剥离";
         private const string ReasonCloseWithAttribute = "闭合标签不支持属性，已剥离";
-        private const string ReasonDepthLimit = "嵌套深度超过 8 层，已剥离";
         private const string ReasonUnclosed = "标签未闭合，已在文本末尾自动闭合";
-        private const string ReasonTruncated = "文本超过 4096 字符上限，超出部分已截断";
 
         /// <summary>
         /// 解析一段富文本。
@@ -121,7 +119,10 @@ namespace AIFramework.Features.RichText
                 {
                     if (stack.Count >= MaxDepth)
                     {
-                        diagnostics.Add(new RichTextDiagnostic(index, token.Raw, ReasonDepthLimit));
+                        diagnostics.Add(new RichTextDiagnostic(
+                            index,
+                            token.Raw,
+                            "嵌套深度超过 " + MaxDepth + " 层，已剥离"));
                         index += token.Raw.Length;
                         continue;
                     }
@@ -167,7 +168,7 @@ namespace AIFramework.Features.RichText
                 diagnostics.Add(new RichTextDiagnostic(
                     MaxInputLength,
                     string.Empty,
-                    ReasonTruncated,
+                    "文本超过 " + MaxInputLength + " 字符上限，超出部分已截断",
                     RichTextDiagnosticKind.Warning));
             }
 

@@ -316,4 +316,12 @@ namespace AIFramework.Core.Testing
         /// 当前 UTC 时刻换算成 Unix 秒（唯一的时间读取点）。
         /// <para>
         /// 用 <see cref="Math.Floor"/> 而不是直接截断：1970 年之前的时刻在截断下会朝 0 取整，
-        /// 让"越早的时刻反而更大"，破坏时间升序；向下�
+        /// 让"越早的时刻反而更大"，破坏时间升序；向下取整保证单调性对所有时刻都成立。
+        /// </para>
+        /// </summary>
+        private long NowUnixSeconds()
+        {
+            return (long)Math.Floor((_time.UtcNow - UnixEpoch).TotalSeconds);
+        }
+    }
+}
