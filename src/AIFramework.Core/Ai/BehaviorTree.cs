@@ -164,18 +164,24 @@ namespace AIFramework.Core.Ai
                 }
             }
 
-            // 环检测 + 深度计算。所有节点都遍历一遍：不可达子图里的环同样属于非法配置。
+            // 环检测 + 深度计算。所有节点都遍历一遍：不可达子图里的环同样属于非法配置，
+            // 深度也按"任意节点到最深后代"取最大值，避免一段不可达的超深链悄悄留在配置里。
             var states = new byte[nodeCount];
             var depths = new int[nodeCount];
+            int maxDepth = 0;
             for (int i = 0; i < nodeCount; i++)
             {
-                MeasureDepth(i, states, depths);
+                int depth = MeasureDepth(i, states, depths);
+                if (depth > maxDepth)
+                {
+                    maxDepth = depth;
+                }
             }
 
-            if (depths[_rootIndex] > MaxDepth)
+            if (maxDepth > MaxDepth)
             {
                 throw new ArgumentException(
-                    "行为树深度 " + depths[_rootIndex] + " 超过上限 " + MaxDepth + "。", nameof(config));
+                    "行为树深度 " + maxDepth + " 超过上限 " + MaxDepth + "。", nameof(config));
             }
 
             _evaluationsUsed = 0;

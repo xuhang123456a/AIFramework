@@ -122,6 +122,12 @@ namespace AIFramework.Core.Ai
             return Action(nodeId, (int)BehaviorAction.MoveAway, priority);
         }
 
+        /// <summary>撤退动作（<see cref="MoveAway"/> 的语义别名，便于配置里表达"低血撤退"）。</summary>
+        public static BehaviorNodeConfig Retreat(int nodeId, int priority = 0)
+        {
+            return MoveAway(nodeId, priority);
+        }
+
         /// <summary>攻击动作（动作码 3）。</summary>
         public static BehaviorNodeConfig Attack(int nodeId, int priority = 0)
         {

@@ -9,14 +9,19 @@
       2. 纯逻辑测试    dotnet test  AIFramework.Pure.sln   （全部用例）
       3. 生成物一致性  dotnet run --project tools/viewgen -- --all
       4. 配置表一致性  dotnet run --project tools/tablegen -- --check
-      5. 适配层形状    pwsh unity/tools/check-adapter-compile.ps1
-      6. 真 Unity      场景生成 + 装配校验 / EditMode / PlayMode（需 -Unity 开关）
+      5. 数值体检      dotnet run --project tools/tablecheck -- --tables tables
+      6. 本地化完整性  dotnet run --project tools/loccheck -- --tables tables
+      7. 运营排期      dotnet run --project tools/opcheck -- --tables tables
+      8. 波次节奏      dotnet run --project tools/wavecheck -- --tables tables
+      9. 本地化转换    dotnet run --project tools/locconvert -- --tables tables --check
+     10. 适配层形状    pwsh unity/tools/check-adapter-compile.ps1
+     11. 真 Unity      场景生成 + 装配校验 / EditMode / PlayMode（需 -Unity 开关）
 
-    第 5 层跑在临时副本工程里（robocopy /MIR + 保留 Library），不影响正在使用的编辑器。
+    第 11 层跑在临时副本工程里（robocopy /MIR + 保留 Library），不影响正在使用的编辑器。
     用户开着 Unity 编辑器时也能跑，但**单机同一时间只应有一个 Unity batchmode**。
 
 .NOTES
-    - 默认不跑第 5 层（秒级反馈）；发布前用 `-Unity` 跑全量。
+    - 默认不跑第 11 层（秒级反馈）；发布前用 `-Unity` 跑全量。
     - 依赖已安装的 Unity 6000.3.21f1（可用 -UnityPath 覆盖）。
 
 .EXAMPLE
@@ -55,39 +60,43 @@ function Invoke-Gate {
     $results.Add("OK   " + $Name)
 }
 
-Invoke-Gate -Name '1/10 语言层：dotnet build' -Action {
+Invoke-Gate -Name '1/11 语言层：dotnet build' -Action {
     dotnet build AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '2/10 纯逻辑测试：dotnet test' -Action {
+Invoke-Gate -Name '2/11 纯逻辑测试：dotnet test' -Action {
     dotnet test AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '3/10 生成物一致性：viewgen --all' -Action {
+Invoke-Gate -Name '3/11 生成物一致性：viewgen --all' -Action {
     dotnet run --project tools/viewgen/ViewGen.csproj -- --all
 }
 
-Invoke-Gate -Name '4/10 配置表一致性：tablegen --check' -Action {
+Invoke-Gate -Name '4/11 配置表一致性：tablegen --check' -Action {
     dotnet run --project tools/tablegen/TableGen.csproj -- --check
 }
 
-Invoke-Gate -Name '5/10 数值体检：tablecheck' -Action {
+Invoke-Gate -Name '5/11 数值体检：tablecheck' -Action {
     dotnet run --project tools/tablecheck/TableCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '6/10 本地化完整性：loccheck' -Action {
+Invoke-Gate -Name '6/11 本地化完整性：loccheck' -Action {
     dotnet run --project tools/loccheck/LocCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '7/10 运营排期：opcheck' -Action {
+Invoke-Gate -Name '7/11 运营排期：opcheck' -Action {
     dotnet run --project tools/opcheck/OpCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '8/10 本地化转换：locconvert --check' -Action {
+Invoke-Gate -Name '8/11 波次节奏：wavecheck' -Action {
+    dotnet run --project tools/wavecheck/WaveCheck.csproj -- --tables tables --check
+}
+
+Invoke-Gate -Name '9/11 本地化转换：locconvert --check' -Action {
     dotnet run --project tools/locconvert/LocConvert.csproj -- --tables tables --check
 }
 
-Invoke-Gate -Name '9/10 适配层形状：check-adapter-compile' -Action {
+Invoke-Gate -Name '10/11 适配层形状：check-adapter-compile' -Action {
     pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 }
 
@@ -96,16 +105,16 @@ if ($Unity) {
         throw ("找不到 Unity 可执行文件：{0}（用 -UnityPath 指定）" -f $UnityPath)
     }
 
-    Invoke-Gate -Name '10/10a 真 Unity：场景生成 + 装配校验' -Action {
+    Invoke-Gate -Name '11/11a 真 Unity：场景生成 + 装配校验' -Action {
         pwsh -NoProfile -File unity/tools/generate-scenes.ps1 -UnityPath $UnityPath
     }
 
     if (-not $SkipUnityTests) {
-        Invoke-Gate -Name '10/10b 真 Unity：EditMode 测试' -Action {
+        Invoke-Gate -Name '11/11b 真 Unity：EditMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform EditMode
         }
 
-        Invoke-Gate -Name '10/10c 真 Unity：PlayMode 测试' -Action {
+        Invoke-Gate -Name '11/11c 真 Unity：PlayMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform PlayMode
         }
     }

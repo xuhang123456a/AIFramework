@@ -105,6 +105,8 @@ namespace AIFramework.Adapters.Console
             WireVoiceOver();
             WireSaveMigration();
             WireEconomySim();
+            WireMatch3Difficulty();
+            WirePlayerMetrics();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -357,6 +359,35 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>玩家数据看板：喂几条埋点事件 → 聚合指标 → 导出单行 CSV（真实事件号）。</summary>
+        private void WirePlayerMetrics()
+        {
+            var metrics = new PlayerMetrics(_time);
+            metrics.BeginSession();
+            metrics.MarkActive();
+            metrics.Track(new AIFramework.Contracts.Services.AnalyticsEvent(
+                AIFramework.Contracts.Services.AnalyticsEventIds.BattleStart, 1, 0, 0, null));
+            metrics.Track(new AIFramework.Contracts.Services.AnalyticsEvent(
+                AIFramework.Contracts.Services.AnalyticsEventIds.BattleEnd, 1, 1200, 0, null));
+            metrics.EndSession();
+
+            _writer.WriteLine(metrics.ToCsv().TrimEnd());
+        }
+
+        /// <summary>三消难度评估演示：对一张 8×8 示例盘算可行手与难度分（关卡批量导入时用同一口径）。</summary>
+        private void WireMatch3Difficulty()
+        {
+            var cells = new int[64];
+            int[] pattern = { 1, 2, 3, 1, 2, 3, 1, 2 };
+            for (int i = 0; i < cells.Length; i++)
+            {
+                cells[i] = pattern[(i / 8 + i % 8) % pattern.Length];
+            }
+
+            Match3DifficultyReport report = Match3DifficultyEvaluator.Evaluate(cells, 8, 8);
+            _writer.WriteLine(report.ToReportLine());
         }
 
         /// <summary>

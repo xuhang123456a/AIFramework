@@ -6,6 +6,7 @@ using AIFramework.Contracts.Ai;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
+using AIFramework.Contracts.Ports;
 using AIFramework.Core.Ai;
 using AIFramework.Core.Replay;
 using AIFramework.Core.Services;
@@ -14,12 +15,17 @@ using UnityEngine;
 namespace AIFramework.Adapters.Unity.Battle
 {
     /// <summary>
-    /// 实时竞技场场景控制器：<b>三波敌人的推进全部编排在适配层，内核每次只负责一场沙盒</b>。
+    /// 实时竞技场场景控制器：<b>逐波敌人的推进全部编排在适配层，内核每次只负责一场沙盒</b>。
     /// <para>
-    /// <b>为什么"一波一局"而不是"一局三波"</b>：<c>Kernel.Realtime</c> 的 <c>IsFinished</c> 语义是
+    /// <b>波次从哪来</b>：开局前先读 <c>TbArenaWave</c>（<see cref="LoadWaveTable"/>），行数就是总波数、
+    /// 每行的数量/血量/速度决定这一波的布场参数；表缺失或非法时打 Warn 并退回内置 3 波。
+    /// 波次曲线的合法性由工具侧 <c>tools/wavecheck</c> 在构建期把关，运行期只做"布场能用"的最小校验。
+    /// </para>
+    /// <para>
+    /// <b>为什么"一波一局"而不是"一局多波"</b>：<c>Kernel.Realtime</c> 的 <c>IsFinished</c> 语义是
     /// "任意单位 HP &lt;= 0 即整场结束"（首个阵亡即收场，死掉的槽位不会被回收），而 <c>Step</c> 在结束之后是空操作、
     /// <c>CollectResult</c> 只能取一次。也就是说单场沙盒里观察不到"第二个阵亡"这个事件，
-    /// 三波不可能塞进同一场会话。所以波次序列由本类持有：每波
+    /// 多波不可能塞进同一场会话。所以波次序列由本类持有：每波
     /// <c>Release</c> 旧会话 → <c>Begin(Realtime, seed + 波次)</c> → 布场 → 逐帧 <c>Step</c>，
     /// 只有<b>终结那波</b>用 <c>EndAndCollect</c> 结算（一场竞技场只广播一次 <c>GameFinishedEvent</c>、只发一次战利品）。
     /// </para>
@@ -57,10 +63,19 @@ namespace AIFramework.Adapters.Unity.Battle
     [DisallowMultipleComponent]
     public sealed class ArenaController : MonoBehaviour
     {
-        /// <summary>总波次：三波清完即胜利。</summary>
-        private const int Waves = 3;
+        /// <summary>
+        /// 内置回退波数：<c>TbArenaWave</c> 缺失或非法时仍按老的三波跑。
+        /// <para>
+        /// <b>为什么保留常量而不是"没表就不开局"</b>：竞技场是演示场景，表没打进包时应当仍然能玩；
+        /// 但"表没配"和"表读坏了"必须能区分开，所以回退时一律打 Warn（见 <see cref="LoadWaveTable"/>）。
+        /// </para>
+        /// </summary>
+        private const int BuiltInWaves = 3;
 
-        /// <summary>竞技场总逻辑帧上限（三波共用），到顶即兜底判负，防"一局永远打不完"。</summary>
+        /// <summary>波次表所在目录（相对 StreamingAssets，与宿主/塔防控制器同一约定）。</summary>
+        private const string TableRelativeDirectory = "AIFrameworkDemo";
+
+        /// <summary>竞技场总逻辑帧上限（整场共用，不随波数变化），到顶即兜底判负，防"一局永远打不完"。</summary>
         private const int MaxTotalFrames = 1200;
 
         /// <summary>回放帧数硬上限：与 <see cref="ArenaRecorder"/> 默认容量一致，保证一次回放在有限时间内结束。</summary>
@@ -226,7 +241,22 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>当前波次；结束后归 <see cref="FirstWave"/> 之外的 0。</summary>
         private int _wave;
 
-        /// <summary>三波累计推进的逻辑帧数（兜底上限按它算，而不是按单场帧号）。</summary>
+        /// <summary>
+        /// 本场总波数：优先取 <c>TbArenaWave</c> 的行数，缺表/非法时为 <see cref="BuiltInWaves"/>。
+        /// <b>它只在开局前变一次</b>（<see cref="LoadWaveTable"/>），之后整局只读，回放脚本与它同源。
+        /// </summary>
+        private int _totalWaves = BuiltInWaves;
+
+        /// <summary>
+        /// 表驱动的每波参数；<c>null</c> = 没读到表（回退内置三波）。
+        /// <para>
+        /// <b>为什么只存"表里写了什么"而不是换算后的 <see cref="WaveSpec"/></b>：布场的唯一真源是回放脚本，
+        /// 表在这里只是"生成脚本的原料"。把换算结果也缓存一份，回放局就一定会在"表被改过"时与录制局分叉。
+        /// </para>
+        /// </summary>
+        private ArenaWaveRow[]? _tableWaves;
+
+        /// <summary>整场累计推进的逻辑帧数（兜底上限按它算，而不是按单场帧号）。</summary>
         private int _framesTotal;
 
         /// <summary>已结束波次累计的反射次数（当前波的实时值另算，见 <see cref="ReflectedCount"/>）。</summary>
@@ -238,16 +268,16 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>本场竞技场是否胜利（结算后与内核结果对齐）。</summary>
         private bool _isVictory;
 
-        /// <summary>当前波次，1..3；结束（胜利/失败/超时）后为 0。</summary>
+        /// <summary>当前波次，1..<see cref="TotalWaves"/>；结束（胜利/失败/超时）后为 0。</summary>
         public int CurrentWave
         {
             get { return _wave; }
         }
 
-        /// <summary>总波次，固定 3。</summary>
+        /// <summary>总波次：波次表（<c>TbArenaWave</c>）的行数；缺表/非法时为内置的 3 波。</summary>
         public int TotalWaves
         {
-            get { return Waves; }
+            get { return _totalWaves; }
         }
 
         /// <summary>本场竞技场是否胜利（未结算时为 <c>false</c>）。</summary>
@@ -345,6 +375,10 @@ namespace AIFramework.Adapters.Unity.Battle
             }
 
             _host = host;
+
+            // 波次表必须在第一波布场之前读完：总波数与每波参数都会被开局路径（CreateScript/StartWave）读到。
+            // 读失败只 Warn 并回退内置三波——竞技场是演示场景，"表没配"不该让整场玩不了。
+            LoadWaveTable(host);
 
             // T5-7 音效桥：宿主目前没有 Audio 属性，用它的资源/日志端口自建一条音效服务
             // （音源节点挂在本控制器下，随场景卸载一起销毁），再把纯逻辑选择器接进去。
@@ -606,6 +640,7 @@ namespace AIFramework.Adapters.Unity.Battle
 
                 // 黑板口径（全部取"这一帧能读到的近似值"，不引入额外状态）：
                 // HP 百分比按满血常量归一；距离是到主角的世界距离四舍五入；
+                // 数量取本波存活敌人总数（场景级近似，不区分"谁是谁的敌人"）；
                 // 冷却就绪 = 这个敌人名下已经没有在飞的弹（弹被反射后 Owner 会改成主角）。
                 int hpPercent = enemy.Hp >= EnemyHp ? 100 : enemy.Hp * 100 / EnemyHp;
                 float distance = Vec2.Distance(enemy.Position, protagonist.Position);
@@ -751,7 +786,7 @@ namespace AIFramework.Adapters.Unity.Battle
                 _reflectedTotal += sandbox.ReflectedCount;
             }
 
-            if (_wave >= Waves)
+            if (_wave >= _totalWaves)
             {
                 Finish(true);
                 return;
@@ -765,7 +800,7 @@ namespace AIFramework.Adapters.Unity.Battle
         /// 开一波：交还旧会话 → <c>Begin(Realtime)</c> → 取三个端口 → 布场。
         /// 初始化失败的路径一律把竞技场停在"未开局"，绝不用错的状态继续推演。
         /// </summary>
-        /// <param name="wave">要开的波次（1..3）。</param>
+        /// <param name="wave">要开的波次（1..<see cref="TotalWaves"/>）。</param>
         private void StartWave(int wave)
         {
             AIFrameworkUnityHost? host = _host;
@@ -831,7 +866,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _binder = CreateBinder(host);
             _protagonist = DeployWave(sandbox, wave, _binder, in spec);
 
-            host.Log.Info("[Arena] 第 " + wave + "/" + Waves + " 波开战：主角 HP=" + ProtagonistHp
+            host.Log.Info("[Arena] 第 " + wave + "/" + _totalWaves + " 波开战：主角 HP=" + ProtagonistHp
                 + "，敌人=" + spec.EnemyCount + "，已用帧=" + _framesTotal);
         }
 
@@ -1150,7 +1185,7 @@ namespace AIFramework.Adapters.Unity.Battle
             StartWave(FirstWave);
             RenderHud();
 
-            host.Log.Info("[Arena] 重开：回到第 " + FirstWave + "/" + Waves + " 波。");
+            host.Log.Info("[Arena] 重开：回到第 " + FirstWave + "/" + _totalWaves + " 波。");
         }
 
         /// <summary>竞技场开局：复位计数并布第一波。</summary>
@@ -1448,22 +1483,106 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
-        /// 生成本局的回放脚本：种子 + 每波敌人数量/半径。
-        /// <b>位置不放进脚本</b>：它是 <c>(序号, 数量)</c> 的纯函数，同一份代码必然算出同一组坐标。
+        /// 读 <c>TbArenaWave</c> 决定本场波次：成功则用表里的行数与每波参数，失败则 Warn + 回退内置 3 波。
+        /// <para>
+        /// <b>为什么加载侧还要再校验一遍</b>：<c>tools/wavecheck</c> 只在构建期跑，打包后的 <c>.bin</c> 可能来自旧版本、
+        /// 也可能被替换；运行期需要一条底线——"行号连续、数量/血量/速度/间隔在区间内、Boss 只在最后一行"，
+        /// 保证布场不会越界。至于难度曲线好不好玩（回落、节奏突变），那是设计问题，不该让整场退化成 3 波。
+        /// </para>
+        /// <para>
+        /// <b>为什么失败不是静默回退</b>：静默回退会让"表没打进包"和"表被配坏了"在真机上完全一样（都只是少打几波），
+        /// 排查成本极高；这里一律 Warn 并带上原因。
+        /// </para>
         /// </summary>
-        private static ArenaReplayScript CreateScript(int seed)
+        /// <param name="host">宿主（资源端口与日志的唯一入口）。</param>
+        private void LoadWaveTable(AIFrameworkUnityHost host)
         {
-            WaveSpec[] waves = new WaveSpec[Waves];
-            for (int i = 0; i < Waves; i++)
-            {
-                int wave = FirstWave + i;
-                waves[i] = new WaveSpec(EnemyCountForWave(wave), EnemyRadius);
-            }
+            _tableWaves = null;
+            _totalWaves = BuiltInWaves;
 
-            return new ArenaReplayScript(seed, Waves, waves);
+            try
+            {
+                IBinaryTableLoader loader = new UnityStreamingAssetsTableLoader(host.Assets, TableRelativeDirectory);
+                byte[]? payload = loader.Load(ArenaWaveTableReader.TableName);
+                if (payload == null)
+                {
+                    host.Log.Warn("[Arena] 没有找到波次表 " + ArenaWaveTableReader.TableName + ".bin（StreamingAssets/"
+                        + TableRelativeDirectory + "），回退内置 " + BuiltInWaves + " 波。");
+                    return;
+                }
+
+                ArenaWaveRow[] rows = ArenaWaveTableReader.Parse(payload);
+                _tableWaves = rows;
+                _totalWaves = rows.Length;
+
+                int minEnemies = rows[0].EnemyCount;
+                int maxEnemies = rows[0].EnemyCount;
+                int bossWave = 0;
+                for (int i = 0; i < rows.Length; i++)
+                {
+                    if (rows[i].EnemyCount < minEnemies)
+                    {
+                        minEnemies = rows[i].EnemyCount;
+                    }
+
+                    if (rows[i].EnemyCount > maxEnemies)
+                    {
+                        maxEnemies = rows[i].EnemyCount;
+                    }
+
+                    if (rows[i].IsBoss)
+                    {
+                        bossWave = rows[i].WaveIndex;
+                    }
+                }
+
+                host.Log.Info("[Arena] 波次表已加载：" + rows.Length + " 波，每波敌人 " + minEnemies + ".." + maxEnemies
+                    + "，Boss 波=" + (bossWave > 0 ? bossWave.ToString() : "无")
+                    + "（难度曲线由 tools/wavecheck 在构建期校验）。");
+
+                if (rows.Length != BuiltInWaves)
+                {
+                    // 帧预算不随波数放大（MaxTotalFrames 是内核/兜底的常量，改它等于改战斗规则），
+                    // 波数越多每波可用帧越少：这条 Warn 是给真机调参的人看的。
+                    host.Log.Warn("[Arena] 波数从内置 " + BuiltInWaves + " 变为 " + rows.Length
+                        + "，但单场帧上限仍是 " + MaxTotalFrames + " 帧（约 "
+                        + (int)(MaxTotalFrames * EffectiveStepSeconds()) + " 秒）：每波可用帧被摊薄，节奏需真机验证。");
+                }
+            }
+            catch (Exception exception) when (exception is InvalidDataException
+                || exception is InvalidOperationException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _tableWaves = null;
+                _totalWaves = BuiltInWaves;
+                host.Log.Warn("[Arena] 波次表 " + ArenaWaveTableReader.TableName + " 读取失败，回退内置 "
+                    + BuiltInWaves + " 波：" + exception.Message);
+            }
         }
 
-        /// <summary>取第 <paramref name="wave"/> 波的布场参数；脚本缺失时退回代码内常量。</summary>
+        /// <summary>
+        /// 生成本局的回放脚本：种子 + 每波敌人数量/半径（波数取 <see cref="_totalWaves"/>）。
+        /// <b>位置不放进脚本</b>：它是 <c>(序号, 数量)</c> 的纯函数，同一份代码必然算出同一组坐标。
+        /// <b>波次参数只从"表或内置常量"取</b>（<see cref="SpecFromData"/>），绝不回读上一局的脚本——
+        /// 否则重开会在表被改过时把旧参数带进新一局，录制/回放的口径就再也对不上了。
+        /// </summary>
+        private ArenaReplayScript CreateScript(int seed)
+        {
+            int waveCount = _totalWaves > 0 ? _totalWaves : BuiltInWaves;
+            WaveSpec[] waves = new WaveSpec[waveCount];
+            for (int i = 0; i < waveCount; i++)
+            {
+                waves[i] = SpecFromData(FirstWave + i);
+            }
+
+            return new ArenaReplayScript(seed, waveCount, waves);
+        }
+
+        /// <summary>
+        /// 取第 <paramref name="wave"/> 波的布场参数：<b>脚本优先</b>（回放局必须逐位复现录制局的布场），
+        /// 脚本没覆盖到时退回表/内置常量。
+        /// </summary>
         private WaveSpec WaveSpecFor(int wave)
         {
             ArenaReplayScript? script = _script;
@@ -1473,7 +1592,76 @@ namespace AIFramework.Adapters.Unity.Battle
                 return script.Waves[index];
             }
 
+            return SpecFromData(wave);
+        }
+
+        /// <summary>按"表优先、内置兜底"把第 <paramref name="wave"/> 波换成布场参数。</summary>
+        private WaveSpec SpecFromData(int wave)
+        {
+            int index = wave - FirstWave;
+            ArenaWaveRow[]? tableWaves = _tableWaves;
+            if (tableWaves != null && index >= 0 && index < tableWaves.Length)
+            {
+                return ToWaveSpec(in tableWaves[index]);
+            }
+
             return new WaveSpec(EnemyCountForWave(wave), EnemyRadius);
+        }
+
+        /// <summary>
+        /// 把一行波次表换算成 <see cref="WaveSpec"/>：<b>只有"数量"能精确表达，血量/速度只能近似到判定半径</b>。
+        /// <para>
+        /// <b>为什么不把 hp/speed 直接喂给布场</b>：<see cref="WaveSpec"/> 只有 <c>EnemyCount</c> 与 <c>Radius</c>，
+        /// 而敌人血量（<see cref="EnemyHp"/>）与追击速度（<see cref="EnemyChaseSpeed"/>）是编译期常量。
+        /// 改这两个常量等于改战斗规则（血量 &gt; 14 时一发反射弹打不死，本波只能靠超时收场），
+        /// 超出"工具侧只加加载逻辑"的权限，所以这里只做<b>可表达维度上的近似</b>：
+        /// </para>
+        /// <list type="bullet">
+        /// <item><description>血量：相对内置基准血量按比例放大判定圈（越肉越容易被反射弹命中，近似"多挨几下"），夹在 0.75~1.6 倍；</description></item>
+        /// <item><description>速度：越快判定圈越小（越容易擦过，近似"更难打中"），夹在 0.7~1.25 倍。</description></item>
+        /// </list>
+        /// <para>
+        /// 半径只影响"擦过还是命中"的余量：反射弹沿原射线飞回，必然穿过敌人中心，所以夹在这个区间内
+        /// 既不会让本波清不掉，也不会改变"同帧全灭"的节奏。表的 <c>spawnIntervalMs</c> / <c>rewardGold</c> /
+        /// <c>bossFlag</c> 在竞技场<b>没有对应表达</b>（本体一次布场全放、战利品由内核结算），
+        /// 只作为诊断与 <c>tools/wavecheck</c> 的校验输入存在。
+        /// </para>
+        /// </summary>
+        /// <param name="row">表里的一行。</param>
+        /// <returns>本波的布场参数。</returns>
+        private static WaveSpec ToWaveSpec(in ArenaWaveRow row)
+        {
+            float hpScale = row.EnemyHp / (float)EnemyHp;
+            if (hpScale < 0.75f)
+            {
+                hpScale = 0.75f;
+            }
+            else if (hpScale > 1.6f)
+            {
+                hpScale = 1.6f;
+            }
+
+            float speedScale = 1000f / (1000f + row.EnemySpeedPermille);
+            if (speedScale < 0.7f)
+            {
+                speedScale = 0.7f;
+            }
+            else if (speedScale > 1.25f)
+            {
+                speedScale = 1.25f;
+            }
+
+            float radius = EnemyRadius * hpScale * speedScale;
+            if (radius < 0.2f)
+            {
+                radius = 0.2f;
+            }
+            else if (radius > 0.6f)
+            {
+                radius = 0.6f;
+            }
+
+            return new WaveSpec(row.EnemyCount, radius);
         }
 
         /// <summary>渲染一次 HUD（会话可能已被置空，故先取本地副本）。</summary>
@@ -1486,8 +1674,8 @@ namespace AIFramework.Adapters.Unity.Battle
             }
         }
 
-        /// <summary>第 <paramref name="wave"/> 波的敌人数量：首波 2 个，之后 3 个（递增压力，仍在 2~3 之间）。</summary>
-        /// <param name="wave">波次（1..3）。</param>
+        /// <summary>内置兜底的第 <paramref name="wave"/> 波敌人数量：首波 2 个，之后 3 个（表缺失时才会走到这里）。</summary>
+        /// <param name="wave">波次（1..<see cref="BuiltInWaves"/>）。</param>
         /// <returns>该波的敌人数量。</returns>
         private static int EnemyCountForWave(int wave)
         {
@@ -1520,6 +1708,214 @@ namespace AIFramework.Adapters.Unity.Battle
         {
             float interval = fixedStepSeconds;
             return interval > 0f ? interval : FallbackStepSeconds;
+        }
+    }
+
+    /// <summary>
+    /// <c>TbArenaWave</c> 的一行：纯数据，列序与 <c>tables/TbArenaWave.json</c> 一致。
+    /// <para>
+    /// <b>为什么和 <see cref="ArenaController"/> 挤在同一个文件</b>：本轮改动范围只允许动这一个适配层文件，
+    /// 而 Unity 程序集不能引用 <c>tools/wavecheck</c>（net10.0 工具工程），运行期读取器只能与控制器同文件；
+    /// 构建期规则仍只在 <c>tools/wavecheck</c>，两边刻意不共享代码（工具侧多查"设计味道"，运行期只保底线）。
+    /// </para>
+    /// </summary>
+    internal readonly struct ArenaWaveRow
+    {
+        /// <summary>构造一行。</summary>
+        /// <param name="waveIndex">波次序号（1 起）。</param>
+        /// <param name="enemyCount">本波敌人数量。</param>
+        /// <param name="enemyHp">单个敌人血量（本关不可逐波表达，只参与半径近似）。</param>
+        /// <param name="enemySpeedPermille">敌人速度千分比（同上）。</param>
+        /// <param name="spawnIntervalMs">出怪间隔（本关一次布场全放，只作诊断）。</param>
+        /// <param name="rewardGold">通关金币（战利品由内核结算，只作诊断）。</param>
+        /// <param name="bossFlag">Boss 标记（0 / 1）。</param>
+        internal ArenaWaveRow(
+            int waveIndex,
+            int enemyCount,
+            int enemyHp,
+            int enemySpeedPermille,
+            int spawnIntervalMs,
+            int rewardGold,
+            int bossFlag)
+        {
+            WaveIndex = waveIndex;
+            EnemyCount = enemyCount;
+            EnemyHp = enemyHp;
+            EnemySpeedPermille = enemySpeedPermille;
+            SpawnIntervalMs = spawnIntervalMs;
+            RewardGold = rewardGold;
+            BossFlag = bossFlag;
+        }
+
+        /// <summary>波次序号（1 起）。</summary>
+        internal int WaveIndex { get; }
+
+        /// <summary>本波敌人数量。</summary>
+        internal int EnemyCount { get; }
+
+        /// <summary>单个敌人血量。</summary>
+        internal int EnemyHp { get; }
+
+        /// <summary>敌人速度（千分比）。</summary>
+        internal int EnemySpeedPermille { get; }
+
+        /// <summary>出怪间隔（毫秒）。</summary>
+        internal int SpawnIntervalMs { get; }
+
+        /// <summary>通关奖励金币。</summary>
+        internal int RewardGold { get; }
+
+        /// <summary>Boss 标记（0 / 1）。</summary>
+        internal int BossFlag { get; }
+
+        /// <summary>本行是否 Boss 波。</summary>
+        internal bool IsBoss
+        {
+            get { return BossFlag == 1; }
+        }
+    }
+
+    /// <summary>
+    /// <c>TbArenaWave.bin</c> 的读取器：布局 = <c>[int32 行数]</c> + 每行 7 个 int32（列序即解析顺序）。
+    /// <para>
+    /// <b>为什么一处不合法就整表失败</b>：波次表是"整条时间轴"，少一行会让后面的波次编号全部前移；
+    /// 悄悄跳过坏行等于把"第 7 波少一个 0"变成"第 7 波还在、只是参数变了"，真机上只会表现为"这波怎么这么弱"。
+    /// 失败后由 <see cref="ArenaController"/> 统一 Warn 并回退内置波次，至少行为是可解释的。
+    /// </para>
+    /// </summary>
+    internal static class ArenaWaveTableReader
+    {
+        /// <summary>表名（与 <c>tables/TbArenaWave.json</c> 的 <c>table</c> 字段一致）。</summary>
+        internal const string TableName = "TbArenaWave";
+
+        /// <summary>固定列数：waveIndex / enemyCount / enemyHp / speed / spawnInterval / rewardGold / bossFlag。</summary>
+        private const int ColumnCount = 7;
+
+        /// <summary>表头：行数 int32。</summary>
+        private const int HeaderBytes = 4;
+
+        /// <summary>单行字节数（7 × int32）。</summary>
+        private const int RowBytes = ColumnCount * 4;
+
+        /// <summary><c>enemyCount</c> 允许区间。</summary>
+        private const int MinEnemyCount = 1;
+
+        /// <summary><c>enemyCount</c> 允许区间。</summary>
+        private const int MaxEnemyCount = 30;
+
+        /// <summary><c>enemyHp</c> 允许区间。</summary>
+        private const int MinEnemyHp = 1;
+
+        /// <summary><c>enemyHp</c> 允许区间。</summary>
+        private const int MaxEnemyHp = 10000;
+
+        /// <summary><c>enemySpeedPermille</c> 允许区间。</summary>
+        private const int MinEnemySpeedPermille = 0;
+
+        /// <summary><c>enemySpeedPermille</c> 允许区间。</summary>
+        private const int MaxEnemySpeedPermille = 3000;
+
+        /// <summary><c>spawnIntervalMs</c> 允许区间。</summary>
+        private const int MinSpawnIntervalMs = 50;
+
+        /// <summary><c>spawnIntervalMs</c> 允许区间。</summary>
+        private const int MaxSpawnIntervalMs = 10000;
+
+        /// <summary>解析整张表；任何一行不合法都抛 <see cref="InvalidDataException"/>。</summary>
+        /// <param name="payload">表的字节流。</param>
+        /// <returns>按行序排列的波次。</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="payload"/> 为 <c>null</c>。</exception>
+        /// <exception cref="InvalidDataException">长度、行号、列值或 Boss 位置不合法。</exception>
+        internal static ArenaWaveRow[] Parse(byte[] payload)
+        {
+            if (payload == null)
+            {
+                throw new ArgumentNullException(nameof(payload));
+            }
+
+            if (payload.Length < HeaderBytes)
+            {
+                throw new InvalidDataException("波次表头部长度不足 " + HeaderBytes + " 字节。");
+            }
+
+            int rowCount = ReadInt32(payload, 0);
+            if (rowCount <= 0)
+            {
+                throw new InvalidDataException("波次表行数为 " + rowCount + "，至少要有 1 波。");
+            }
+
+            long expectedLength = HeaderBytes + ((long)rowCount * RowBytes);
+            if (payload.Length != expectedLength)
+            {
+                throw new InvalidDataException(
+                    "波次表长度 " + payload.Length + " 与声明行数 " + rowCount + " 不符，期望 " + expectedLength + " 字节。");
+            }
+
+            var rows = new ArenaWaveRow[rowCount];
+            for (int i = 0; i < rowCount; i++)
+            {
+                int offset = HeaderBytes + (i * RowBytes);
+                int waveIndex = ReadInt32(payload, offset);
+                int enemyCount = ReadInt32(payload, offset + 4);
+                int enemyHp = ReadInt32(payload, offset + 8);
+                int enemySpeed = ReadInt32(payload, offset + 12);
+                int spawnInterval = ReadInt32(payload, offset + 16);
+                int rewardGold = ReadInt32(payload, offset + 20);
+                int bossFlag = ReadInt32(payload, offset + 24);
+
+                if (waveIndex != i + 1)
+                {
+                    throw new InvalidDataException(
+                        "波次表第 " + (i + 1) + " 行的 waveIndex 为 " + waveIndex + "，要求从 1 开始连续递增。");
+                }
+
+                EnsureRange(waveIndex, "enemyCount", enemyCount, MinEnemyCount, MaxEnemyCount);
+                EnsureRange(waveIndex, "enemyHp", enemyHp, MinEnemyHp, MaxEnemyHp);
+                EnsureRange(waveIndex, "enemySpeedPermille", enemySpeed, MinEnemySpeedPermille, MaxEnemySpeedPermille);
+                EnsureRange(waveIndex, "spawnIntervalMs", spawnInterval, MinSpawnIntervalMs, MaxSpawnIntervalMs);
+
+                if (rewardGold < 0)
+                {
+                    throw new InvalidDataException(
+                        "波次表 waveIndex=" + waveIndex + " 的 rewardGold 为负数：" + rewardGold + "。");
+                }
+
+                if (bossFlag != 0 && bossFlag != 1)
+                {
+                    throw new InvalidDataException(
+                        "波次表 waveIndex=" + waveIndex + " 的 bossFlag 只能是 0 或 1，实际 " + bossFlag + "。");
+                }
+
+                if (bossFlag == 1 && i != rowCount - 1)
+                {
+                    throw new InvalidDataException(
+                        "波次表 waveIndex=" + waveIndex + " 标了 bossFlag=1 但不是最后一行（最后一行 waveIndex="
+                        + rowCount + "）：Boss 必须且只能是最终波。");
+                }
+
+                rows[i] = new ArenaWaveRow(
+                    waveIndex, enemyCount, enemyHp, enemySpeed, spawnInterval, rewardGold, bossFlag);
+            }
+
+            return rows;
+        }
+
+        private static void EnsureRange(int waveIndex, string column, int value, int min, int max)
+        {
+            if (value < min || value > max)
+            {
+                throw new InvalidDataException(
+                    "波次表 waveIndex=" + waveIndex + " 的 " + column + "=" + value
+                    + " 越界（允许 " + min + ".." + max + "）。");
+            }
+        }
+
+        private static int ReadInt32(byte[] payload, int offset)
+        {
+            return payload[offset]
+                | (payload[offset + 1] << 8)
+                | (payload[offset + 2] << 16)
+                | (payload[offset + 3] << 24);
         }
     }
 }
