@@ -3,6 +3,7 @@ using AIFramework.Adapters.Unity;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Localization;
 using AIFramework.Contracts.Meta;
+using AIFramework.Contracts.Services;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Localization;
@@ -142,6 +143,11 @@ namespace AIFramework.Tests.EditMode
             // 限时礼包表必须装配；社交假后端要能赠送/领取（本地模拟）。
             Assert.IsTrue(host.LimitedOfferAvailable, "限时礼包缺表：TbLimitedOffer.bin。");
             Assert.IsTrue(host.Friends.GiftStamina("friend-1").Success, "给好友送体力应成功。");
+
+            // 推送：假后端能授权、登记 token、排一条每日提醒。
+            Assert.AreEqual(PushPermissionState.Granted, host.Push.RequestPermission(), "假推送后端应直接授权。");
+            Assert.AreEqual(PushRegisterResult.Success, host.PushScheduler.EnsureRegistered("editmode-token-1"), "推送 token 登记应成功。");
+            Assert.IsTrue(host.PushScheduler.ScheduleDaily(1, "体力已满", "回来看看吧", 9, 0), "每日提醒应排期成功。");
             Assert.True(host.Friends.ClaimAllStamina() > 0, "一键领取应拿到体力。");
 
             // 广告端口：未接真实 SDK 时必须如实不可用。

@@ -1,4 +1,5 @@
 #nullable enable
+using AIFramework.Adapters.Unity.Localization;
 using AIFramework.Adapters.Unity.Lobby;
 using AIFramework.Adapters.Unity.Ui;
 using UnityEditor;
@@ -201,6 +202,8 @@ namespace AIFramework.Demo.Editor
             SetReference(popupHud, "closeButton", closeButton);
             SetReference(controller, "popupHud", popupHud);
 
+            var localizationHotSwitcher = lobbyGo.AddComponent<LocalizationHotSwitcher>();
+            SetReference(controller, "localizationHotSwitcher", localizationHotSwitcher);
             var localizationHud = lobbyGo.AddComponent<AIFramework.Adapters.Unity.Lobby.LocalizationHud>();
             SetReference(localizationHud, "languageText", languageText);
             SetReference(localizationHud, "playText", playText);

@@ -3,6 +3,7 @@ using System;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Core.Save;
+using AIFramework.Adapters.Unity.Localization;
 using AIFramework.Adapters.Unity.Scene;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Features.DailySignIn;
@@ -58,11 +59,32 @@ namespace AIFramework.Adapters.Unity.Lobby
         [Tooltip("本地化演示（可选）：显示当前语言文案并循环切换语言。")]
         [SerializeField] private LocalizationHud? localizationHud = null;
 
+        [Tooltip("语言热切换器（可选）：切语言时刷新所有已打开面板，避免旧文案残留。")]
+        [SerializeField] private LocalizationHotSwitcher? localizationHotSwitcher = null;
+
         private AIFrameworkUnityHost? _host;
         private SignInPresenter? _signIn;
         private ShopPresenter? _shop;
         private QuestPresenter? _quests;
         private MailPresenter? _mails;
+
+        /// <summary>
+        /// 仅测试用：暴露宿主实例（宿主不是 MonoBehaviour，PlayMode 取不到它）。
+        /// <para>命名带 ForTests 是为了让生产代码一眼看出不该依赖；PlayMode 用它在总线上发语言切换命令。</para>
+        /// </summary>
+        public AIFrameworkUnityHost HostForTests
+        {
+            get
+            {
+                AIFrameworkUnityHost? host = _host;
+                if (host == null)
+                {
+                    throw new System.InvalidOperationException("宿主尚未初始化。");
+                }
+
+                return host;
+            }
+        }
 
         private void Awake()
         {
@@ -94,6 +116,12 @@ namespace AIFramework.Adapters.Unity.Lobby
             if (battleButton != null)
             {
                 battleButton.onClick.AddListener(OnBattleClicked);
+            }
+
+            // 语言热切换：登记已打开面板，切语言时统一重查文案（不依赖各面板自己订阅）。
+            if (localizationHotSwitcher != null)
+            {
+                localizationHotSwitcher.Bind(host);
             }
 
             TryLoadInventory();

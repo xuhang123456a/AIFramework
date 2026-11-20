@@ -58,6 +58,11 @@ namespace UnityEngine
         }
 
         /// <summary>取自身或子节点上的组件（形状桩）。真实 Unity 在 Component 上也有这个名字。</summary>
+        public T[] GetComponents<T>() where T : Component
+        {
+            return System.Array.Empty<T>();
+        }
+
         public T GetComponent<T>() where T : Component
         {
             return null!;
@@ -112,6 +117,11 @@ namespace UnityEngine
         public void SetActive(bool value) { activeSelf = value; }
 
         /// <summary>取自身或子节点上的组件（形状桩，运行期返回 null）。Unity 自己不标注可空，这里照抄其表面。</summary>
+        public T[] GetComponents<T>() where T : Component
+        {
+            return System.Array.Empty<T>();
+        }
+
         public T GetComponent<T>() where T : Component
         {
             return null!;

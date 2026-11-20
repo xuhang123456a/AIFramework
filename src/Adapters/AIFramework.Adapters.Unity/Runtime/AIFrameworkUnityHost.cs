@@ -112,6 +112,10 @@ namespace AIFramework.Adapters.Unity
 
         private readonly LimitedOfferHandler? _limitedOffers;
 
+        private readonly UnityPushService _push;
+
+        private readonly PushScheduler _pushScheduler;
+
         private readonly ExperimentHandler? _experiment;
 
         private readonly UnityAdService _ads;
@@ -301,8 +305,10 @@ namespace AIFramework.Adapters.Unity
             }            _toastPresenter = new UnityToastPresenter(_logger);
             _toastRouter = new ErrorToastRouter(_bus, _toastPresenter);
             _accountSession = new AccountSessionManager(new UnityAccountService(_storage, _time, available: true), _time);
-            _social = new UnitySocialService(_storage, _time, available: true);
+            _social = new UnitySocialService(new UnityStoragePort("social"), _time, available: true);
             _friends = new FriendService(_social, _time);
+            _push = new UnityPushService(new UnityStoragePort("push"), _time, available: true);
+            _pushScheduler = new PushScheduler(_push, _time, maxScheduled: 8);
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _popups = new PopupQueue();
@@ -384,6 +390,18 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>推送后端（Phase 1 本地模拟：权限/ token / 计划表都在本地，不接 APNs/FCM）。</summary>
+        public UnityPushService Push
+        {
+            get { return _push; }
+        }
+
+        /// <summary>推送排期器（每日提醒换算成绝对触发时刻；到期由适配层轮询处理）。</summary>
+        public PushScheduler PushScheduler
+        {
+            get { return _pushScheduler; }
         }
 
         /// <summary>好友服务（本地假社交后端：赠送/领取体力，跨日重置走时间端口）。</summary>

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using AIFramework.Contracts.Localization;
+using AIFramework.Adapters.Unity.Localization;
 using AIFramework.Features.Localization;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,7 +15,7 @@ namespace AIFramework.Adapters.Unity.Lobby
     /// 缺 key 时按约定回退成 key 本身，面板也把这种情况显式标出来。
     /// </para>
     /// </summary>
-    public sealed class LocalizationHud : MonoBehaviour
+    public sealed class LocalizationHud : MonoBehaviour, ILocalizedPanel
     {
         [SerializeField] private Text languageText = null!;
         [SerializeField] private Text playText = null!;
@@ -67,6 +68,12 @@ namespace AIFramework.Adapters.Unity.Lobby
             {
                 switchButton.onClick.RemoveListener(SwitchLanguage);
             }
+        }
+
+        /// <summary>实现 <see cref="ILocalizedPanel"/>：语言变化时由热切换器统一调用，重查三条文案。</summary>
+        public void RefreshLocalizedText()
+        {
+            Render();
         }
 
         private void Render()

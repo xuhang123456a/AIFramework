@@ -95,6 +95,7 @@ namespace AIFramework.Adapters.Console
             WireExperiment();
             WireLimitedOffers();
             WireSocial();
+            WirePush();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -318,6 +319,22 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>推送接线：权限 → token → 每日提醒排期（假推送后端，不联网、不弹系统框）。</summary>
+        private void WirePush()
+        {
+            var push = new ConsolePushService(_time);
+            var scheduler = new PushScheduler(push, _time, maxScheduled: 8);
+
+            PushPermissionState permission = push.RequestPermission();
+            PushRegisterResult registered = scheduler.EnsureRegistered("console-demo-token-0001");
+            bool scheduled = scheduler.ScheduleDaily(1, "体力已满", "回来看看吧", 9, 0);
+            PushNotification[] plan = push.GetScheduled();
+
+            _writer.WriteLine("[Push] 权限=" + permission + " 登记=" + registered
+                + " 排期=" + scheduled + " 计划=" + plan.Length
+                + " 下次触发=" + (plan.Length > 0 ? plan[0].FireAtUnixSeconds : 0));
+        }
+
         /// <summary>社交接线：赠送/领取体力，跨日重置由时间驱动（假社交后端，不联网）。</summary>
         private void WireSocial()
         {
