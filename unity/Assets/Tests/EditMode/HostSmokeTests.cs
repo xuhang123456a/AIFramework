@@ -148,6 +148,12 @@ namespace AIFramework.Tests.EditMode
             Assert.AreEqual(PushPermissionState.Granted, host.Push.RequestPermission(), "假推送后端应直接授权。");
             Assert.AreEqual(PushRegisterResult.Success, host.PushScheduler.EnsureRegistered("editmode-token-1"), "推送 token 登记应成功。");
             Assert.IsTrue(host.PushScheduler.ScheduleDaily(1, "体力已满", "回来看看吧", 9, 0), "每日提醒应排期成功。");
+
+            // 错误上报：聚合器必须在；上报一条后待发队列应为 1，flush 成功后清零。
+            host.ErrorReporter.Report(ErrorReportLevel.Warning, "editmode.probe", "host smoke");
+            Assert.AreEqual(1, host.ErrorReporter.PendingCount, "上报一条后待发队列应为 1。");
+            Assert.IsTrue(host.ErrorReporter.TryFlush(), "假上报通道应能 flush 成功。");
+            Assert.AreEqual(0, host.ErrorReporter.PendingCount, "flush 成功后待发队列应清空。");
             // 领取/赠送按 UTC 日落盘（同机器同一天重跑会 AlreadyClaimed），所以只断言后端可用，
             // 不断言"今天还能领"——那会变成与运行时段相关的 flaky 测试。
             Assert.IsTrue(host.Friends.Social.IsAvailable, "假社交后端应可用。");

@@ -116,6 +116,8 @@ namespace AIFramework.Adapters.Unity
 
         private readonly PushScheduler _pushScheduler;
 
+        private readonly ErrorReportAggregator _errorReporter;
+
         private readonly ExperimentHandler? _experiment;
 
         private readonly UnityAdService _ads;
@@ -309,6 +311,7 @@ namespace AIFramework.Adapters.Unity
             _friends = new FriendService(_social, _time);
             _push = new UnityPushService(new UnityStoragePort("push"), _time, available: true);
             _pushScheduler = new PushScheduler(_push, _time, maxScheduled: 8);
+            _errorReporter = new ErrorReportAggregator(_time, bus: null, uploader: new UnityErrorUploader(_logger));
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _popups = new PopupQueue();
@@ -390,6 +393,12 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>错误上报器：聚合去重后经日志通道上报（Phase 1 无真实上报服务）。</summary>
+        public ErrorReportAggregator ErrorReporter
+        {
+            get { return _errorReporter; }
         }
 
         /// <summary>推送后端（Phase 1 本地模拟：权限/ token / 计划表都在本地，不接 APNs/FCM）。</summary>

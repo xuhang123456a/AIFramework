@@ -96,6 +96,8 @@ namespace AIFramework.Adapters.Console
             WireLimitedOffers();
             WireSocial();
             WirePush();
+            WireErrorReport();
+            WireReconcile();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -319,6 +321,53 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>掉单对账接线：拿一批"商店已成交"的收据对账，Missing 的补发一次。</summary>
+        private void WireReconcile()
+        {
+            var analytics = new ConsoleAnalyticsService(new System.IO.StringWriter());
+            var flow = new ConsoleStorePurchaseFlow(_bus, analytics);
+            var reconciler = new PurchaseReconciler(new IapPurchaseLedgerAdapter(flow.Ledger), _bus);
+
+            var receipts = new[]
+            {
+                new PurchaseReceipt("console-receipt-gold60", ConsoleIapService.ProductGold60,
+                    ConsoleIapService.GoldItemId, 60, 0, "granted"),
+                new PurchaseReceipt("console-receipt-no-ads", ConsoleIapService.ProductNoAds,
+                    2001, 1, 0, "refunded"),
+            };
+
+            ReconcileAction[] actions = reconciler.Reconcile(receipts);
+            int granted = 0;
+            for (int i = 0; i < actions.Length; i++)
+            {
+                if (actions[i].State == ReconcileState.Missing && reconciler.TryGrantMissing(actions[i].ReceiptId))
+                {
+                    granted++;
+                }
+            }
+
+            _writer.WriteLine("[Reconcile] 动作=" + actions.Length + " 补发=" + granted
+                + " 掉单=" + reconciler.MissingCount + " 已发=" + reconciler.GrantedCount
+                + " 退款=" + reconciler.RefundedCount);
+        }
+
+        /// <summary>错误上报接线：聚合去重 → 批量上传（假通道），致命错误立即上报。</summary>
+        private void WireErrorReport()
+        {
+            var uploader = new ConsoleErrorUploader(_writer);
+            var reporter = new ErrorReportAggregator(_time, _bus, uploader);
+
+            reporter.Report(ErrorReportLevel.Warning, "network.timeout", "请求超时");
+            reporter.Report(ErrorReportLevel.Warning, "network.timeout", "请求超时");
+            reporter.Report(ErrorReportLevel.Error, "save.corrupt", "存档校验失败");
+            bool flushed = reporter.TryFlush();
+
+            _writer.WriteLine("[ErrorReport] 待发=" + reporter.PendingCount
+                + " 上报次数=" + reporter.ReportedCount
+                + " 立即上报=" + flushed
+                + " 成功批=" + uploader.Uploaded.Count);
+        }
+
         /// <summary>推送接线：权限 → token → 每日提醒排期（假推送后端，不联网、不弹系统框）。</summary>
         private void WirePush()
         {
