@@ -36,6 +36,9 @@ jobs:
       - name: Unity 适配层形状级编译校验（无需 Unity）
         run: pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 
+      - name: 数值体检（价格/主键/经验单调/权重等不变量）
+        run: dotnet run --project tools/tablecheck/TableCheck.csproj --no-build -- --tables tables
+
       - name: 配置表导出结果与两个目标目录逐字节一致（与 legacy fixtures 交叉校验）
         run: |
           dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --verify-against unity/Assets/StreamingAssets/AIFrameworkDemo

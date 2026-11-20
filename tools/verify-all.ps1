@@ -55,23 +55,27 @@ function Invoke-Gate {
     $results.Add("OK   " + $Name)
 }
 
-Invoke-Gate -Name '1/6 语言层：dotnet build' -Action {
+Invoke-Gate -Name '1/7 语言层：dotnet build' -Action {
     dotnet build AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '2/6 纯逻辑测试：dotnet test' -Action {
+Invoke-Gate -Name '2/7 纯逻辑测试：dotnet test' -Action {
     dotnet test AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '3/6 生成物一致性：viewgen --all' -Action {
+Invoke-Gate -Name '3/7 生成物一致性：viewgen --all' -Action {
     dotnet run --project tools/viewgen/ViewGen.csproj -- --all
 }
 
-Invoke-Gate -Name '4/6 配置表一致性：tablegen --check' -Action {
+Invoke-Gate -Name '4/7 配置表一致性：tablegen --check' -Action {
     dotnet run --project tools/tablegen/TableGen.csproj -- --check
 }
 
-Invoke-Gate -Name '5/6 适配层形状：check-adapter-compile' -Action {
+Invoke-Gate -Name '5/7 数值体检：tablecheck' -Action {
+    dotnet run --project tools/tablecheck/TableCheck.csproj -- --tables tables
+}
+
+Invoke-Gate -Name '6/7 适配层形状：check-adapter-compile' -Action {
     pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 }
 
@@ -80,16 +84,16 @@ if ($Unity) {
         throw ("找不到 Unity 可执行文件：{0}（用 -UnityPath 指定）" -f $UnityPath)
     }
 
-    Invoke-Gate -Name '6/6a 真 Unity：场景生成 + 装配校验' -Action {
+    Invoke-Gate -Name '7/7a 真 Unity：场景生成 + 装配校验' -Action {
         pwsh -NoProfile -File unity/tools/generate-scenes.ps1 -UnityPath $UnityPath
     }
 
     if (-not $SkipUnityTests) {
-        Invoke-Gate -Name '6/6b 真 Unity：EditMode 测试' -Action {
+        Invoke-Gate -Name '7/7b 真 Unity：EditMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform EditMode
         }
 
-        Invoke-Gate -Name '6/6c 真 Unity：PlayMode 测试' -Action {
+        Invoke-Gate -Name '7/7c 真 Unity：PlayMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform PlayMode
         }
     }
