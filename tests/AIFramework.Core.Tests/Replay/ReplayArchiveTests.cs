@@ -74,7 +74,7 @@ namespace AIFramework.Core.Tests.Replay
     /// <list type="bullet">
     /// <item>字节布局写死（magic 'AIFR' + 版本 + 头 + 波次段 + 帧段），字段逐项往返；</item>
     /// <item>magic/版本不符、截断、尾部多余、负 count、超上限 count、非法半径一律 <c>false</c> 且给 reason；</item>
-    /// <item>槽位键 <c>prefix/levelId-seed-recordedAt</c> 稳定，同参数重复保存是覆盖而非新增；</item>
+    /// <item>槽位键 <c>prefix.levelId-seed-recordedAt</c> 稳定（分隔符必须是端口白名单内的 <c>.</c>），同参数重复保存是覆盖而非新增；</item>
     /// <item>列表倒序、坏档跳过并计数、容量 20 超限删最旧（但绝不删刚保存的那一档）；</item>
     /// <item>同一 storage 重建 Store 仍能列出并读回（跨实例/跨进程重启的语义）。</item>
     /// </list>

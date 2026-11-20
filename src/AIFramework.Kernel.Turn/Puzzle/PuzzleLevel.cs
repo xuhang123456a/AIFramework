@@ -153,6 +153,36 @@ namespace AIFramework.Kernel.Turn.Puzzle
             }
         }
 
+        /// <summary>
+        /// 从外部行数组建关（行序顶部→底部），供配置表/编辑器导出的关卡数据使用。
+        /// <para>
+        /// <b>为什么必须有这个入口</b>：编辑器和配置表产出的关卡如果不能进内核，所谓"数据驱动关卡"
+        /// 就只是把 JSON 读出来打印一遍。这里把外部行送进与内置关卡**完全同一条**解析路径，
+        /// 避免"内置关卡一套解析、外部关卡另一套解析"——两套解析迟早对字符语义产生分歧。
+        /// </para>
+        /// </summary>
+        /// <param name="levelId">关卡 id（仅诊断用，不参与夹取）。</param>
+        /// <param name="rows">行数组，第一行是棋盘顶部；字符语义与内置关卡一致。</param>
+        /// <param name="sourceName">数据来源名（报错定位用，例如 <c>puzzle-demo.json</c>）。</param>
+        /// <returns>解析后的不可变关卡定义。</returns>
+        /// <exception cref="ArgumentException">行数据非法（空/尺寸越界/宽度不一致/未知字符/玩家数不为 1/缺箱子或目标点）。</exception>
+        internal static PuzzleLevel CreateFromRows(int levelId, string[] rows, string sourceName)
+        {
+            if (rows == null)
+            {
+                throw new ArgumentNullException(nameof(rows));
+            }
+
+            string source = string.IsNullOrEmpty(sourceName) ? "外部关卡" : sourceName;
+            try
+            {
+                return Parse(levelId, rows);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new ArgumentException(source + "：" + exception.Message, nameof(rows));
+            }
+        }
         /// <summary>把地形与初始箱位拷进调用方的定长数组（<see cref="PuzzleWorld"/> 的 <c>Reset</c> 复用）。</summary>
         internal void CopyTo(PuzzleCell[] cells, bool[] boxes)
         {

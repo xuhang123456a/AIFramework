@@ -125,6 +125,8 @@ namespace AIFramework.Demo.Editor
             var hud = puzzleGo.AddComponent<PuzzleHud>();
 
             SetReference(controller, "hud", hud);
+            // 关卡 JSON：留空会被 SceneVerifier 判为漏注入（也确实应该显式指定演示关卡）。
+            SetString(controller, "puzzleDataFile", "Levels/puzzle-demo");
             SetInt(controller, "levelId", DefaultLevelId);
             SetInt(controller, "randomSeed", DefaultRandomSeed);
             SetFloat(controller, "autoStepSeconds", DefaultAutoStepSeconds);

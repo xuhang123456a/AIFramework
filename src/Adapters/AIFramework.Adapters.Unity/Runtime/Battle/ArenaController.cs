@@ -6,6 +6,7 @@ using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Replay;
+using AIFramework.Core.Services;
 using UnityEngine;
 
 namespace AIFramework.Adapters.Unity.Battle
@@ -143,6 +144,28 @@ namespace AIFramework.Adapters.Unity.Battle
         /// </summary>
         private RealtimeSceneBinder? _binder;
 
+        /// <summary>
+        /// 本场景的音效服务。<b>宿主暂未公开 <c>Audio</c> 属性</b>，所以这里用宿主已有的
+        /// 资源/日志端口自建一条（音源节点挂在控制器下，随场景销毁）；宿主将来补上 <c>Audio</c> 后
+        /// 只需要把这一行换成 <c>host.Audio</c>，桥与选择器一行都不用改。
+        /// </summary>
+        private UnityAudioService? _audio;
+
+        /// <summary>
+        /// 音效选择器（纯逻辑，在 Core）。控制器持有它只为把"本局请求了多少条 cue"暴露成
+        /// <see cref="AudioCueCount"/>；规则本身一个字都不在这里。
+        /// </summary>
+        private BattleAudioCueSelector? _audioSelector;
+
+        /// <summary>音效桥：每帧把帧差翻成 cue 再交给 <see cref="_audio"/>。</summary>
+        private BattleAudioBridge? _audioBridge;
+
+        /// <summary>
+        /// 帧快照采样器：把本波的两个只读视图 + 反射计数拼成 <c>BattleAudioFrame</c>。
+        /// <b>换波不用换它</b>：差值口径已把"新会话基线"钳成 0（见 <c>BattleAudioFrameSampler</c> 注释）。
+        /// </summary>
+        private BattleAudioFrameSampler? _audioSampler;
+
         /// <summary>本波主角句柄（超时兜底时要靠它定位主角）。</summary>
         private UnitHandle _protagonist;
 
@@ -207,6 +230,23 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
+        /// 本局音效桥累计请求播放的 cue 条数（生命周期累计，重开不清）。
+        /// <para>
+        /// <b>它数的是"请求"而不是"真的听见"</b>：PlayMode 里没有音频资源、也没有声卡，
+        /// 能断言的只有"桥算出了多少条该播的 cue"；真机是否出声取决于 <c>Resources/Audio/&lt;id&gt;</c>
+        /// 是否存在（缺失只会 Warn 一次并静默跳过，见 <c>UnityAudioService</c>）。
+        /// </para>
+        /// </summary>
+        public int AudioCueCount
+        {
+            get
+            {
+                BattleAudioCueSelector? selector = _audioSelector;
+                return selector != null ? selector.EmittedCount : 0;
+            }
+        }
+
+        /// <summary>
         /// 累计反射次数（已结束波次 + 当前波实时值）。
         /// <b>为什么是 internal 而不是 public</b>：公开面只放"波次/胜负/回放结果"这类场景契约，
         /// 这是给同程序集的 <see cref="ArenaHud"/> 拼状态行用的诊断值，不该出现在场景对外契约里。
@@ -244,6 +284,13 @@ namespace AIFramework.Adapters.Unity.Battle
 
             _host = host;
 
+            // T5-7 音效桥：宿主目前没有 Audio 属性，用它的资源/日志端口自建一条音效服务
+            // （音源节点挂在本控制器下，随场景卸载一起销毁），再把纯逻辑选择器接进去。
+            _audio = host.Audio;
+            _audioSelector = new BattleAudioCueSelector();
+            _audioBridge = new BattleAudioBridge(_audio, _audioSelector);
+            _audioSampler = new BattleAudioFrameSampler();
+
             ArenaHud? view = hud;
             if (view != null)
             {
@@ -277,6 +324,8 @@ namespace AIFramework.Adapters.Unity.Battle
             session.Step(EffectiveStepSeconds());
             _framesTotal++;
 
+            TickAudio();
+
             RecordFrame();
 
             RealtimeSceneBinder? binder = _binder;
@@ -293,6 +342,32 @@ namespace AIFramework.Adapters.Unity.Battle
             }
 
             RenderHud();
+        }
+
+        /// <summary>
+        /// 帧内音效推进：采样只读视图 → 选择器算 cue → <c>PlaySfx</c>。
+        /// <para>
+        /// <b>为什么紧跟 <c>Step</c> 之后、<see cref="Tick"/> 之前</b>：本帧的伤害/阵亡/反射都发生在这一次
+        /// <c>Step</c> 里，而 <see cref="Tick"/> 在换波时会释放会话（<c>_units</c> 置空），
+        /// 晚一步就再也读不到"这一帧死了人"的现场。
+        /// </para>
+        /// <para>
+        /// <b>时间用逻辑帧长而不是 <c>Time.deltaTime</c></b>：节流窗口要对齐内核的固定步长，
+        /// 否则高刷屏会让同一串连击响得更密（同一份回放在 30/144 fps 下听感不同）。
+        /// </para>
+        /// </summary>
+        private void TickAudio()
+        {
+            BattleAudioBridge? bridge = _audioBridge;
+            BattleAudioFrameSampler? sampler = _audioSampler;
+            UnityAudioService? audio = _audio;
+            if (bridge == null || sampler == null || audio == null)
+            {
+                return;
+            }
+
+            BattleAudioFrame frame = sampler.Capture(_units, _projectiles, _sandbox);
+            bridge.Tick(audio, in frame, EffectiveStepSeconds());
         }
 
         /// <summary>
@@ -467,6 +542,10 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 host.Log.Warn("[Arena] 会话未完整实现只读视图，场景里不会创建任何碰撞体（HUD 也无法显示战场状态）。");
             }
+
+            // 新会话的音效基线必须重新起：上一波残弹数与本波开场弹数恰好相同时，
+            // "飞行物变多"的差分会把这一波的齐射整段漏掉（这一行只影响音效，不影响任何战斗状态）。
+            _audioSampler?.Reset();
 
             // 布场前先把绑定器建好：AddUnit/AddProjectile 要在 SpawnUnit/SpawnProjectile 之后立刻调用，
             // 句柄只有在刚生成时才能与内核里的那一份对上。
@@ -715,6 +794,18 @@ namespace AIFramework.Adapters.Unity.Battle
             _units = null;
             _projectiles = null;
             _finished = true;
+
+            // 音效桥先摘引用再释放音源：桥的 Tick 只在 Update 里跑，摘引用保证卸载过程中不会再有
+            // 逐帧调用摸到已释放的 AudioSource；音源节点是本控制器的子节点，Dispose 只是提前销毁。
+            UnityAudioService? audio = _audio;
+            _audio = null;
+            _audioBridge = null;
+            _audioSampler = null;
+            _audioSelector = null;
+            if (audio != null)
+            {
+                audio.Dispose();
+            }
 
             // 先撤掉本场生成的对象与碰撞体登记，再释放宿主；两步都不能省，
             // 否则重进场景时上一场的映射会一直挂在宿主级空间查询里。

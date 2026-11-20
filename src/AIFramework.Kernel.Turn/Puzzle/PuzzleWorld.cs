@@ -101,7 +101,38 @@ namespace AIFramework.Kernel.Turn.Puzzle
             LoadInitialState();
         }
 
-        /// <summary>关卡宽（列数）。</summary>
+        /// <summary>
+        /// 从外部行数组建关（行序顶部→底部）：配置表 / 编辑器导出的关卡走这条构造。
+        /// <para>
+        /// <b>与原构造的分工</b>：无参重载继续用内置 3 关（教学与回归基线不动）；
+        /// 本重载只替换"关卡数据来源"，状态机、推箱判定、结算全部复用同一份实现。
+        /// </para>
+        /// <para>
+        /// <b>非法数据一律在构造期失败</b>：读档/热更在构造期炸掉比运行到第三帧才炸容易定位；
+        /// 错误消息带来源名（<paramref name="sourceName"/>）与具体原因。
+        /// </para>
+        /// </summary>
+        /// <param name="init">会话初始化数据（<c>LevelId</c> 仅诊断用）。</param>
+        /// <param name="tilesTopDown">行数组，第一行是棋盘顶部；字符语义见 <c>PuzzleLevel</c>。</param>
+        /// <param name="sourceName">数据来源名（报错定位用）。</param>
+        /// <exception cref="ArgumentException">行数据非法。</exception>
+        public PuzzleWorld(in GameplayInitData init, string[] tilesTopDown, string sourceName = "external-level")
+        {
+            _level = PuzzleLevel.CreateFromRows(init.LevelId, tilesTopDown, sourceName);
+            _cells = new PuzzleCell[_level.Width * _level.Height];
+            _boxes = new bool[_level.Width * _level.Height];
+
+            _playerX = 0;
+            _playerY = 0;
+            _moves = 0;
+            _boxesOnGoal = 0;
+            _stepCount = 0;
+            _resultCollected = false;
+
+            LoadInitialState();
+        }
+
+        /// <summary>关卡宽（列数）。</summary>        /// <summary>关卡宽（列数）。</summary>
         public int Width
         {
             get { return _level.Width; }

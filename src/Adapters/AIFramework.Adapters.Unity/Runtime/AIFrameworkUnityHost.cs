@@ -95,6 +95,8 @@ namespace AIFramework.Adapters.Unity
 
         private readonly UnityIapService _iap;
 
+        private readonly UnityAudioService _audio;
+
         private readonly UnityAdService _ads;
 
         /// <summary>内核工厂；宿主通过它 <c>Begin</c> 会话，再用 <see cref="UnityKernelFactory.LastRealtime"/> 拿战局引用。</summary>
@@ -242,6 +244,7 @@ namespace AIFramework.Adapters.Unity
             _spatial = new UnitySpatialQuery(spatialBufferCapacity, spatialLayerMask);
             _vfx = new UnityVfxService(_logger);
             _iap = new UnityIapService(storage: _storage, storeId: "purchases");
+            _audio = new UnityAudioService(_assets, _logger);
             _ads = new UnityAdService(_time, available: false);
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
 
@@ -330,6 +333,12 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>音频服务（全局共享一个实例：多场景并存时不应各自建一套音源与音量写入）。</summary>
+        public UnityAudioService Audio
+        {
+            get { return _audio; }
         }
 
         /// <summary>广告端口；接真实 SDK 前 IsAvailable 恒为 false，调用方必须先判 IsAvailable。</summary>
@@ -439,7 +448,8 @@ namespace AIFramework.Adapters.Unity
             // 场景卸载时未结算的对局直接丢弃引用：BattleWorld 是纯内存对象，没有原生资源需要释放。
             if (_sessions.HasActiveSession)
             {
-                _vfx.Dispose();
+                _audio.Dispose();
+            _vfx.Dispose();
             _sessions.Release();
             }
         }

@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using AIFramework.Kernel.Turn.Puzzle;
+using System.Collections.Generic;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Gameplay.Turn;
 using AIFramework.Contracts.Meta;
@@ -24,6 +26,20 @@ namespace AIFramework.Adapters.Unity.Battle
     /// <b>为什么用 <see cref="Update"/> 计时而不是协程</b>：宪法禁止把业务节奏挂到 <c>IEnumerator</c> /
     /// <c>StartCoroutine</c> 上——协程在场景卸载、组件禁用、<c>Time.timeScale = 0</c> 时的行为各不相同，
     /// 且无法在无头测试里驱动。累加器 + <c>Time.deltaTime</c> 只有一条可读的时间线。
+    /// </para>
+    /// <para>
+    /// <b>关卡 JSON（T5-9）</b>：<see cref="Awake"/> 里先按 <see cref="puzzleDataFile"/>（可配）→
+    /// <c>Levels/puzzle-&lt;levelId&gt;</c> → <c>Levels/puzzle-demo</c> 的顺序找
+    /// <c>Resources</c> 下的关卡 JSON，解析并校验（格式见 <see cref="PuzzleLevelJson"/>），
+    /// 把摘要写进日志；<b>缺失或非法一律 <c>Log.Warn</c> 并回退内置关卡，绝不让玩法崩</b>。
+    /// </para>
+    /// <para>
+    /// <b>已知缺口（必须写在明处）</b>：开局走 <c>host.Sessions.Begin → UnityKernelFactory</c>，
+    /// 而该工厂的 Puzzle 分支目前只 <c>new PuzzleWorld(in init)</c>（按 <see cref="GameplayInitData.LevelId"/>
+    /// 取内置关卡），<b>没有</b>把外部布局传给内核的通道；工厂不在本任务写范围内。
+    /// 因此本类读到的 JSON 目前只用于<b>数据校验与布局比对</b>（不一致会明确告警），棋盘仍按内置关卡运行。
+    /// 要让它真正驱动棋盘，需要工厂把行数组透传给内核的外部关卡构造，再由本类在
+    /// <c>Begin</c> 之前把 <c>_levelData</c> 交出去；在那之前这里<b>不做</b>任何"看起来像是加载了 JSON"的伪装。
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -61,6 +77,22 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>随机种子：内置关卡是确定的，仍按门禁契约透传，便于将来换成配置表关卡。</summary>
         [SerializeField] private int randomSeed = 20261120;
+
+        /// <summary>
+        /// 关卡 JSON 的 <c>Resources</c> 名（可配）。可写 <c>puzzle-demo</c> 或 <c>Levels/puzzle-demo</c>；
+        /// 留空时按关卡 ID 推导 <c>Levels/puzzle-&lt;levelId&gt;</c>，再退到示例 <c>Levels/puzzle-demo</c>。
+        /// </summary>
+        [SerializeField] private string puzzleDataFile = string.Empty;
+
+        /// <summary>本次从 Resources 读到的关卡 JSON；<c>null</c> 表示没读到或没通过校验（此时走内置关卡）。</summary>
+        private PuzzleLevelData? _levelData;
+
+        /// <summary>
+        /// 当前会话是否由本控制器**直接**构造（外部 JSON 关卡），而非宿主 <c>Sessions</c> 托管。
+        /// <para>宿主会话表只认 <see cref="GameplayInitData"/>，不认"外部布局"，所以外部关卡必须绕开它；
+        /// 代价是释放时要按这个标记区分，否则会去释放一个不在表里的会话。</para>
+        /// </summary>
+        private bool _directSession;
 
         /// <summary>自动解法每步之间的间隔（秒）。默认 0.35 秒，肉眼能看清"推一格"而不是瞬移。</summary>
         [SerializeField] private float autoStepSeconds = 0.35f;
@@ -210,6 +242,10 @@ namespace AIFramework.Adapters.Unity.Battle
         /// <summary>
         /// 建宿主并开局。<b>为什么在 <c>Awake</c> 而不是 <c>Start</c></b>：HUD 的按钮订阅与首帧渲染要在
         /// 玩家可能点下去之前就绪；挂到 <c>Start</c> 会留一个"第一次点击没反应"的空窗。
+        /// <para>
+        /// 顺序固定为"建宿主 → 订 HUD → 读关卡 JSON → 开局 → 报告 JSON 与内核布局的比对结果"：
+        /// JSON 只在这条链上做校验与诊断，开局仍然交给内核；读 JSON 失败不会改变开局流程。
+        /// </para>
         /// </summary>
         private void Awake()
         {
@@ -218,7 +254,152 @@ namespace AIFramework.Adapters.Unity.Battle
             _host = host;
 
             SubscribeHud();
-            BeginSession(ClampLevel(levelId));
+
+            int level = ClampLevel(levelId);
+            TryLoadLevelJson(level);
+            BeginSession(level);
+            ReportLevelJsonUsage();
+        }
+
+        /// <summary>
+        /// 尝试从 <c>Resources</c> 读关卡 JSON：读到就解析 + 校验，并把摘要写进日志。
+        /// <b>任何失败路径都只告警、不抛、不改开局流程</b>——缺一个开发者数据文件不该让玩法停摆。
+        /// </summary>
+        /// <param name="level">已夹取到 1..3 的关卡 ID（用于推导默认资源名）。</param>
+        private void TryLoadLevelJson(int level)
+        {
+            AIFrameworkUnityHost? host = _host;
+            if (host == null)
+            {
+                return;
+            }
+
+            string? resourceName = FindLevelResourceName(level);
+            if (resourceName == null)
+            {
+                host.Log.Warn("[Puzzle] 未找到关卡 JSON（" + PuzzleLevelJson.ResourceNameForLevel(level)
+                    + " 与 " + PuzzleLevelJson.ResourceNameFor(PuzzleLevelJson.DemoId)
+                    + " 都不存在），改用内置关卡 " + level + "。");
+                return;
+            }
+
+            TextAsset? asset = Resources.Load<TextAsset>(resourceName);
+            if (asset == null)
+            {
+                host.Log.Warn("[Puzzle] 关卡 JSON 无法作为 TextAsset 读取：" + resourceName
+                    + "，改用内置关卡 " + level + "。");
+                return;
+            }
+
+            PuzzleLevelData? data;
+            IReadOnlyList<string> errors;
+            if (!PuzzleLevelJson.TryParse(asset.text, out data, out errors) || data == null)
+            {
+                host.Log.Warn("[Puzzle] 关卡 JSON 校验未通过：" + resourceName + "（共 " + errors.Count
+                    + " 项），改用内置关卡 " + level + "。");
+                for (int i = 0; i < errors.Count; i++)
+                {
+                    host.Log.Warn("[Puzzle] - " + errors[i]);
+                }
+
+                return;
+            }
+
+            _levelData = data;
+            host.Log.Info("[Puzzle] 关卡 JSON 已载入：" + resourceName + "（id=" + data.Id
+                + "，" + data.Width + "×" + data.Height
+                + "，玩家=(" + data.PlayerX + "," + data.PlayerY + ")"
+                + "，箱子=" + data.BoxCount + "，目标=" + data.GoalCount + "）。");
+        }
+
+        /// <summary>
+        /// 按优先级找关卡 JSON 的 <c>Resources</c> 名：<see cref="puzzleDataFile"/>（显式配置）→
+        /// <c>Levels/puzzle-&lt;levelId&gt;</c>（按关卡编号）→ <c>Levels/puzzle-demo</c>（示例兜底）。
+        /// </summary>
+        /// <param name="level">已夹取到 1..3 的关卡 ID。</param>
+        /// <returns>资源名；一个都不存在时返回 <c>null</c>。</returns>
+        private string? FindLevelResourceName(int level)
+        {
+            string configured = puzzleDataFile == null ? string.Empty : puzzleDataFile.Trim();
+            if (configured.Length > 0)
+            {
+                // 允许两种写法："puzzle-demo" 与 "Levels/puzzle-demo"。
+                return configured.IndexOf('/') >= 0 ? configured : PuzzleLevelJson.ResourceNameFor(configured);
+            }
+
+            string byLevel = PuzzleLevelJson.ResourceNameForLevel(level);
+            if (Resources.Load<TextAsset>(byLevel) != null)
+            {
+                return byLevel;
+            }
+
+            string demo = PuzzleLevelJson.ResourceNameFor(PuzzleLevelJson.DemoId);
+            return Resources.Load<TextAsset>(demo) != null ? demo : null;
+        }
+
+        /// <summary>
+        /// 把"JSON 与内核实际布局"的关系明确写进日志：一致 → Info；不一致 → Warn 并说明
+        /// 内核尚未支持外部布局（**不静默**，否则以后没人知道 JSON 没生效）。
+        /// </summary>
+        private void ReportLevelJsonUsage()
+        {
+            AIFrameworkUnityHost? host = _host;
+            PuzzleLevelData? data = _levelData;
+            IPuzzleReadView? view = _readView;
+            if (host == null || data == null || view == null)
+            {
+                return;
+            }
+
+            if (data.Width != view.Width || data.Height != view.Height)
+            {
+                host.Log.Warn("[Puzzle] 关卡 JSON 布局尚未生效：内核 PuzzleWorld 只按 LevelId 取内置关卡，"
+                    + "本次运行内置第 " + _currentLevel + " 关（" + view.Width + "×" + view.Height
+                    + "），JSON 是 " + data.Width + "×" + data.Height
+                    + "；JSON 仅用于数据校验与编辑器回读。");
+                return;
+            }
+
+            int mismatches = CountLayoutMismatches(data, view);
+            if (mismatches == 0)
+            {
+                host.Log.Info("[Puzzle] 关卡 JSON 与内核当前布局逐格一致（" + data.Width + "×" + data.Height + "）。");
+                return;
+            }
+
+            host.Log.Warn("[Puzzle] 关卡 JSON 与内核内置第 " + _currentLevel + " 关有 " + mismatches
+                + " 格/项不一致；本次仍以内置关卡为准（JSON 未注入棋盘）。");
+        }
+
+        /// <summary>逐格比较 JSON 与只读视图的地形/箱子，并比较玩家位置；返回不一致的格数（玩家算 1 项）。</summary>
+        /// <param name="data">已通过校验的关卡 JSON。</param>
+        /// <param name="view">内核当前关卡的只读视图。</param>
+        /// <returns>不一致计数。</returns>
+        private static int CountLayoutMismatches(PuzzleLevelData data, IPuzzleReadView view)
+        {
+            int mismatches = 0;
+            for (int y = 0; y < data.Height; y++)
+            {
+                for (int x = 0; x < data.Width; x++)
+                {
+                    char tile = data.GetTile(x, y);
+                    PuzzleCell expected = PuzzleLevelJson.IsWall(tile)
+                        ? PuzzleCell.Wall
+                        : PuzzleLevelJson.IsGoal(tile) ? PuzzleCell.Goal : PuzzleCell.Floor;
+
+                    if (view.GetCell(x, y) != expected || view.HasBox(x, y) != PuzzleLevelJson.IsBox(tile))
+                    {
+                        mismatches++;
+                    }
+                }
+            }
+
+            if (view.PlayerX != data.PlayerX || view.PlayerY != data.PlayerY)
+            {
+                mismatches++;
+            }
+
+            return mismatches;
         }
 
         /// <summary>
@@ -287,14 +468,50 @@ namespace AIFramework.Adapters.Unity.Battle
             _readView = null;
             _input = null;
             _collected = false;
+            _directSession = false;
 
-            if (host.Sessions.HasActiveSession)
+            if (_directSession)
+            {
+                // 外部关卡会话不在宿主会话表里（宿主只认 GameplayInitData），直接丢弃引用即可；
+                // 它不是 IDisposable，也没有原生资源需要释放。
+                _directSession = false;
+            }
+            else if (host.Sessions.HasActiveSession)
             {
                 host.Sessions.Release();
             }
 
-            IGameplaySession session;
             var init = new GameplayInitData(level, randomSeed, PuzzleUnitCount);
+
+            // 优先用编辑器/配置表导出的关卡 JSON 建局：内核侧的"外部行"构造是 T5-9 的唯一入口。
+            // 外部关卡不经过 host.Sessions（宿主会话表只认 GameplayInitData），由本控制器直接持有，
+            // 所以释放路径用 _directSession 区分。
+            IGameplaySession? external = TryCreateExternalSession(host, in init);
+            if (external != null)
+            {
+                _session = external;
+                _directSession = true;
+                _readView = external as IPuzzleReadView;
+                _input = external as IPuzzleInput;
+
+                if (_readView != null && _input != null)
+                {
+                    RenderHud();
+                    ReportExternalLevelApplied(host, _levelData!);
+                    host.Log.Info("[Puzzle] 开局（外部关卡）：尺寸=" + _readView.Width + "×" + _readView.Height
+                        + " 箱子=" + _readView.BoxCount + " 自动步长=" + EffectiveAutoStepSeconds() + "s");
+                    return;
+                }
+
+                // 理论上不可达（PuzzleWorld 同时实现三张契约）；真到了这里也绝不能用错的状态继续跑。
+                host.Log.Error("[Puzzle] 外部关卡会话未实现解谜契约，已回退内置关卡。");
+                _session = null;
+                _readView = null;
+                _input = null;
+                _directSession = false;
+            }
+
+            IGameplaySession session;
             try
             {
                 session = host.Sessions.Begin(GameplayKernelType.Puzzle, in init);
@@ -338,6 +555,35 @@ namespace AIFramework.Adapters.Unity.Battle
                 + " 箱子=" + _readView.BoxCount + " 自动步长=" + EffectiveAutoStepSeconds() + "s");
         }
 
+        /// <summary>
+        /// 尝试用已校验的关卡 JSON 建外部会话：解析通过但内核拒绝（布局非法）时记 Warn 并返回 null，
+        /// 由调用方回退内置关卡——缺一个关卡文件绝不能让玩法崩。
+        /// </summary>
+        private IGameplaySession? TryCreateExternalSession(AIFrameworkUnityHost host, in GameplayInitData init)
+        {
+            PuzzleLevelData? data = _levelData;
+            if (data == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return new PuzzleWorld(in init, data.GetRows(), data.Id + ".json");
+            }
+            catch (ArgumentException exception)
+            {
+                host.Log.Warn("[Puzzle] 关卡 JSON 未被内核接受，已回退内置关卡：" + exception.Message);
+                return null;
+            }
+        }
+
+        /// <summary>外部关卡生效后的日志：把"数据驱动关卡真的进了棋盘"写在明处（不是只打印一遍 JSON）。</summary>
+        private static void ReportExternalLevelApplied(AIFrameworkUnityHost host, PuzzleLevelData data)
+        {
+            host.Log.Info("[Puzzle] 关卡 JSON 已注入棋盘：" + data.Id + "（" + data.Width + "×" + data.Height
+                + "，" + data.BoxCount + " 箱 / " + data.GoalCount + " 目标）。");
+        }
         /// <summary>
         /// 按累加器推进一步内置解法。
         /// <para>
