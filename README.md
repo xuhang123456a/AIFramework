@@ -1,10 +1,10 @@
 # AIFramework
 
-> **一句话**：引擎无关（纯 C#）的游戏框架 —— 一套 CQE 契约 + 两套玩法内核 + 十四个业务切片 + 十七个 Unity 场景，
+> **一句话**：引擎无关（纯 C#）的游戏框架 —— 一套 CQE 契约 + 两套玩法内核 + 十九个业务切片 + 二十四个 Unity 场景，
 > 所有玩法共用同一个总线/背包/红点/存档/因果日志，新增玩法不改其它模块。
 >
 > 当前状态（2026-11-20）：**1481 个纯逻辑测试 + 11 个 Unity EditMode 测试 + 34 个 PlayMode 测试全绿**；
-> 十七个场景离屏生成并通过装配校验；`AIFramework.exe` 真出包 60 MB。
+> 二十四个场景离屏生成并通过装配校验；`AIFramework.exe` 真出包 86.6 MB；平台端口（IAP/广告/排行榜/云存档/埋点/推送契约）全部有假实现与无头测试。
 
 ---
 
@@ -26,7 +26,7 @@ pwsh tools/verify-all.ps1 -Unity
 # 3) 命令行冒烟（签到/商店/任务/邮件/弹窗 + 九套卡带巡礼 + 音频/校验端口）
 dotnet run --project src/Adapters/AIFramework.Adapters.Console/AIFramework.Adapters.Console.csproj
 
-# 4) 打开 Unity 工程，打开 BootScene 点 Play（17 个场景可从大厅进入）
+# 4) 打开 Unity 工程，打开 BootScene 点 Play（24 个场景可从大厅进入）
 #    unity/ 是完整工程；脚本都在"临时副本工程"里跑 batchmode，不影响正在用的编辑器
 
 # 5) 出 Windows 冒烟包（产物在副本工程 Build/Windows 下，不进版本库）
@@ -48,7 +48,7 @@ src/
   Adapters/Console/           无头适配（冒烟、卡带巡礼）
   Adapters/Unity/             引擎端口实现 + 场景绑定 + 视图 Binder
 unity/                        Unity 工程（17 场景 + 4 个 Editor 流水线脚本）
-tests/                        纯逻辑测试（1033 例）+ ArchTests 架构守卫 + Unity EditMode/PlayMode
+tests/                        纯逻辑测试（1481 例）+ ArchTests 架构守卫 + Unity EditMode/PlayMode
 tools/                        verify-all / new-slice / viewgen / tablegen / fixtures(legacy)
 Doc/                          架构总纲 / 切片规范与验证流 / 玩法卡带索引 / HybridCLR 方案 / 路线图
 ```
