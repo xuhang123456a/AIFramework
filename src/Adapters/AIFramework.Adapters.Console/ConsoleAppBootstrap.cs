@@ -5,6 +5,7 @@ using AIFramework.Contracts.Gameplay.Turn;
 using AIFramework.Contracts.Gm;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
+using AIFramework.Adapters.Console.E2e;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Contracts.Services;
@@ -112,6 +113,7 @@ namespace AIFramework.Adapters.Console
             WirePlayerMetrics();
             WireGuideDemo();
             WireSaveCompression();
+            WireAssetBundles();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -145,6 +147,7 @@ namespace AIFramework.Adapters.Console
             ConsoleServices.RunSelfCheck(_writer);
             PublishBattleFacts();
             WireGm();
+            RunE2e();
             CleanupStorage();
 
             _writer.WriteLine("Realtime 推进帧数=" + realtimeFrames + "，最终道具=" + DescribeInventory());
@@ -365,6 +368,20 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>分包清单校验演示：核心包/关卡包/赛季包 + 依赖关系，打印体积与问题汇总。</summary>
+        private void WireAssetBundles()
+        {
+            var bundles = new[]
+            {
+                new AssetBundleSpec("core", new[] { "ui/common.prefab", "audio/common.bnk" }, System.Array.Empty<string>(), 12L * 1024 * 1024),
+                new AssetBundleSpec("levels", new[] { "scenes/lobby.unity", "scenes/arena.unity" }, new[] { "core" }, 24L * 1024 * 1024),
+                new AssetBundleSpec("season", new[] { "ui/season.prefab", "audio/season.bnk" }, new[] { "core" }, 8L * 1024 * 1024),
+            };
+
+            AssetBundleReport report = AssetBundleValidator.Validate(bundles);
+            _writer.WriteLine(report.ToReportLine());
         }
 
         /// <summary>存档压缩演示：对真实 AISV 存档做 deflate，打印体积对比（云存档按字节计费）。</summary>
@@ -1074,6 +1091,37 @@ namespace AIFramework.Adapters.Console
                 + " args=[" + first.Arguments + "] op=" + first.OperatorId
                 + " 权限=" + first.Permission + " 成功=" + first.Success
                 + " 时间=" + first.ExecutedAtUnixSeconds);
+        }
+
+        /// <summary>
+        /// 端到端冒烟（T9-1）：把"登录 → 购买 → 战斗 → 结算 → 存档 → 对账"串成一条可断言场景并实跑。
+        /// <para>
+        /// 装配侧只做三件事：建一条商店闭环（它自带两份台账）、给存档开一个场景独占前缀
+        /// （<c>e2e</c>，不碰业务槽位）、把已有依赖原样交给 <see cref="ConsoleE2eScenarios.MainFlow"/>。
+        /// 断言与编排全部在场景里，这里不写任何业务判定。
+        /// </para>
+        /// <para>
+        /// 失败只体现在报告里（<c>结论=失败</c>），<b>不打断后续冒烟步骤</b>：冒烟是"一次跑完看全貌"，
+        /// 一条链路红灯不该让 GM/大厅等无关段落全部消失。
+        /// </para>
+        /// </summary>
+        private void RunE2e()
+        {
+            var purchaseFlow = new ConsoleStorePurchaseFlow(
+                _bus, new ConsoleAnalyticsService(new System.IO.StringWriter()));
+            var save = new SaveService(_storage, "e2e");
+            E2eScenario scenario = ConsoleE2eScenarios.MainFlow(_time, _bus, purchaseFlow, _inventory, _host, save);
+            E2eReport report = new E2eRunner(_time).Run(in scenario);
+
+            _writer.WriteLine(report.ToReportLine());
+            for (int i = 0; i < report.Results.Length; i++)
+            {
+                E2eStepResult step = report.Results[i];
+                string state = !step.Executed ? "未执行" : (step.Passed ? "通过" : "失败");
+                _writer.WriteLine("  [E2E] " + (i + 1) + ". " + step.StepName + " → " + state
+                    + " " + step.ElapsedMilliseconds + "ms"
+                    + (step.Message.Length > 0 ? "（" + step.Message + "）" : string.Empty));
+            }
         }
 
         /// <summary>引导快照查询（GM 统计与引导演示共用同一口径）。</summary>

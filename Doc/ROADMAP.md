@@ -170,15 +170,15 @@
 
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
-| T9-1 | 端到端冒烟编排 | 跨模块 E2E 场景脚本（登录→购买→战斗→结算→存档） | [ ] |
+| T9-1 | 端到端冒烟编排 | 跨模块 E2E 场景脚本 | [x] `E2eRunner/Scenario/Report` + `ConsoleE2eScenarios.MainFlow`（8 步：登录→购买→重复购买拒绝→到账→战斗→结算→存档→对账）；Console 实测 8/8 通过 |
 | T9-2 | 服务端契约仿真 | Mock 网关：请求/响应夹具 + 错误注入 | [ ] |
 | T9-3 | UI 绑定生成增强 | UIBindNode → ViewBinder 生成器升级（漏绑定即编译错误） | [ ] |
 | T9-4 | 回放列表 UI | 回放列表页数据 + 播放/删除交互 | [ ] |
 | T9-5 | 邮件/公告富文本 | 富文本标签白名单 + 安全渲染 | [ ] |
-| T9-6 | 资源分包清单 | AB/分包清单 + 依赖校验 | [ ] |
+| T9-6 | 资源分包清单 | AB/分包清单 + 依赖校验 | [x] `AssetBundleValidator`（重名/重复资源/缺失依赖/循环依赖 = 错误；体积/深度/空包 = 提示）+ 固定 [Bundle] 报告行；18 例；Console 实测 3 分包 6 资源 0 错误 |
 | T9-7 | 埋点校验工具 | 事件号/字段/枚举一致性扫描 | [x] `tools/analyticscheck`：契约常量解析、悬空引用/魔法数字/废弃号/构造参数数；真实仓 9 事件 35 引用 0 错误；43 例；verify-all 第 11 层 |
 | T9-8 | 存档压缩 | 压缩编解码 + 体积回归 | [x] `SaveCompression`（AIFC 头 + Deflate、解压炸弹上限、`ShouldCompress` 阈值、固定 [Compress] 报告行）16 例；Console 实测 504B→295B（58.5%） |
-| T9-9 | 帧同步对拍工具 | 输入回放对拍（指纹/哈希） | [ ] |
+| T9-9 | 帧同步对拍工具 | 输入回放对拍（指纹/哈希） | [x] `FrameSyncComparer`（逐帧指纹比对、首个分歧定位、长度不一致处理、上下文描述）；22 例 |
 | T9-10 | GM 控制台 | GM 命令注册/权限/审计日志 | [x] `GmConsole`（三级权限/异常隔离/环形审计）+ `GmConsoleAdapter`（give/advance.time/set.language/reset.guide/stats）；Console 实测 4 条含越权拒绝 |
 ---
 
