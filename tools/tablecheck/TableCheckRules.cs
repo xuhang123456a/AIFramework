@@ -105,6 +105,9 @@ namespace AIFramework.TableCheck
                 case "TbLimitedOffer":
                     CheckLimitedOffer(pair.Value, issues);
                     break;
+                case "TbVoiceLine":
+                    CheckVoiceLine(pair.Value, issues);
+                    break;
                 case "TbExperiment":
                     CheckExperiment(pair.Value, issues);
                     break;
@@ -428,6 +431,48 @@ namespace AIFramework.TableCheck
             {
                 issues.Add(new TableIssue(table.Schema.TableName, rowIndex, columnName,
                     "Unix 秒必须为正（int32 溢出/未配置都会让时间窗口静默失效）"));
+            }
+        }
+        /// <summary>
+        /// 语音字幕：主键是 (lineId, language) 复合键——同一句台词在每种语言各一行，
+        /// 因此**不能**套用"lineId 唯一"的通用规则（那会把多语言行全判成重复）。
+        /// </summary>
+        private static void CheckVoiceLine(TableData table, List<TableIssue> issues)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                int? lineId = GetInt(table, i, "lineId");
+                int? language = GetInt(table, i, "language");
+                if (lineId.HasValue && language.HasValue)
+                {
+                    string composite = lineId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        + ":" + language.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (!seen.Add(composite))
+                    {
+                        issues.Add(new TableIssue(table.Schema.TableName, i, "lineId",
+                            "同一 (lineId, language) 重复：后一行会覆盖前一行"));
+                    }
+                }
+
+                if (language.HasValue && (language.Value < 0 || language.Value > 2))
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "language", "语言枚举必须是 0..2"));
+                }
+
+                int? startMs = GetInt(table, i, "startMs");
+                int? endMs = GetInt(table, i, "endMs");
+                if (startMs.HasValue && endMs.HasValue && endMs.Value <= startMs.Value)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "endMs",
+                        "字幕结束时间必须晚于开始时间（相等时字幕永远不显示）"));
+                }
+
+                string? speaker = GetString(table, i, "speaker");
+                if (speaker != null && speaker.Length == 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "speaker", "说话人不能为空"));
+                }
             }
         }
         /// <summary>字符串列唯一性（空值跳过，空值由各表自己的规则判）。</summary>

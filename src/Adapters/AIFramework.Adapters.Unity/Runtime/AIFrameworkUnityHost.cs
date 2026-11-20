@@ -25,6 +25,7 @@ using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
 using AIFramework.Features.Quest;
 using AIFramework.Features.SeasonPass;
+using AIFramework.Features.VoiceOver;
 using AIFramework.Features.Shop;
 
 namespace AIFramework.Adapters.Unity
@@ -117,6 +118,10 @@ namespace AIFramework.Adapters.Unity
         private readonly PushScheduler _pushScheduler;
 
         private readonly ErrorReportAggregator _errorReporter;
+
+        private readonly VoiceOverHandler? _voiceOver;
+
+        private readonly SaveMigrationService _saveMigration;
 
         private readonly ExperimentHandler? _experiment;
 
@@ -290,6 +295,22 @@ namespace AIFramework.Adapters.Unity
                 _experiment = null;
                 _logger.Error("A/B 实验装配失败（TbExperiment.bin 缺失或损坏），已跳过：" + exception.Message);
             }
+            // 语音字幕：表缺失降级（不影响启动；UI 隐藏字幕即可）。
+            try
+            {
+                var voice = new VoiceOverHandler(_bus, _tableLoader);
+                voice.Register(_bus);
+                _voiceOver = voice;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _voiceOver = null;
+                _logger.Error("语音字幕装配失败（TbVoiceLine.bin 缺失或损坏），已跳过：" + exception.Message);
+            }
+
             // 限时礼包：表缺失时同样降级（不让一个礼包表把整个宿主启动搞崩）。
             try
             {
@@ -312,6 +333,7 @@ namespace AIFramework.Adapters.Unity
             _push = new UnityPushService(new UnityStoragePort("push"), _time, available: true);
             _pushScheduler = new PushScheduler(_push, _time, maxScheduled: 8);
             _errorReporter = new ErrorReportAggregator(_time, bus: null, uploader: new UnityErrorUploader(_logger));
+            _saveMigration = new SaveMigrationService(_storage, _time);
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _popups = new PopupQueue();
@@ -393,6 +415,33 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>游客档 → 账号档迁移（登录成功后调用；UnionBest 合并，保留游客备份）。</summary>
+        public SaveMigrationService SaveMigration
+        {
+            get { return _saveMigration; }
+        }
+
+        /// <summary>语音字幕是否装配成功（表缺失时降级为 false）。</summary>
+        public bool VoiceOverAvailable
+        {
+            get { return _voiceOver != null; }
+        }
+
+        /// <summary>语音字幕入口；未装配时抛 <see cref="InvalidOperationException"/>。</summary>
+        public VoiceOverHandler VoiceOver
+        {
+            get
+            {
+                VoiceOverHandler? current = _voiceOver;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("语音字幕尚未装配成功（TbVoiceLine.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
         }
 
         /// <summary>错误上报器：聚合去重后经日志通道上报（Phase 1 无真实上报服务）。</summary>

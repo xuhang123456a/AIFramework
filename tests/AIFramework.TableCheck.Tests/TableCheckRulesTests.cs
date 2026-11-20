@@ -15,6 +15,45 @@ namespace AIFramework.TableCheck.Tests
     public sealed class TableCheckRulesTests
     {
         [Fact]
+        public void VoiceLine_DuplicateLineLanguagePair_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbVoiceLine",
+                "lineId,speaker,textKey,audioKey,language,startMs,endMs",
+                "1,hero,vo.a,vo.a0,0,0,1000;1,hero,vo.a,vo.a0,0,2000,3000");
+
+            Assert.Contains(issues, issue => issue.Column == "lineId" && issue.Message.Contains("重复"));
+        }
+
+        [Fact]
+        public void VoiceLine_SameLineOtherLanguage_IsAllowed()
+        {
+            List<TableIssue> issues = ValidateSingle("TbVoiceLine",
+                "lineId,speaker,textKey,audioKey,language,startMs,endMs",
+                "1,hero,vo.a,vo.a0,0,0,1000;1,hero,vo.a,vo.a1,1,0,1000");
+
+            Assert.DoesNotContain(issues, issue => issue.Column == "lineId");
+        }
+
+        [Fact]
+        public void VoiceLine_ReversedSubtitleWindow_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbVoiceLine",
+                "lineId,speaker,textKey,audioKey,language,startMs,endMs",
+                "1,hero,vo.a,vo.a0,0,2000,1000");
+
+            Assert.Contains(issues, issue => issue.Column == "endMs");
+        }
+
+        [Fact]
+        public void VoiceLine_InvalidLanguage_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbVoiceLine",
+                "lineId,speaker,textKey,audioKey,language,startMs,endMs",
+                "1,hero,vo.a,vo.a0,3,0,1000");
+
+            Assert.Contains(issues, issue => issue.Column == "language");
+        }
+        [Fact]
         public void LimitedOffer_FinalPriceFloorsToZero_IsReported()
         {
             List<TableIssue> issues = ValidateSingle("TbLimitedOffer",

@@ -139,9 +139,9 @@
 | T7-3 | 排行榜服务端化 | 分页/同分排序/赛季重置 | [x] `ILeaderboardServer` + `LeaderboardPager`（同分按 playerId 升序、FetchAroundSelf≤2 次请求、Limit 回显应用上限）73 例；Console `[Leaderboard]` 已接 |
 | T7-4 | 热更资源校验 | 资源清单 hash + 缺失/损坏回退 | [x] `ResourceManifestVerifier`（缺失/截断/哈希不符三类区分 + 全有或全无回退）+ 18 例；Console `[Resource]` 用真实 18 张表实测 0 失败 |
 | T7-5 | 画质与帧率自适应 | 帧耗时驱动档位 + 动态降级 | [x] `QualityTierSelector`(36 例，环形窗口/迟滞/冷却零分配) + `UnityQualitySettingsPort` + `QualityTierAutoAdapter`；BootScene 接线 |
-| T7-6 | 跨平台存档迁移 | 游客→正式账号合并、设备迁移夹具 | [ ] |
+| T7-6 | 跨平台存档迁移 | 游客→正式账号合并、设备迁移夹具 | [x] `SaveMigrationService`（四策略裁决、备份先写、目标坏档绝不覆盖、重复迁移幂等）39 例；Console `[SaveMigrate]`、宿主 `SaveMigration` 已接 |
 | T7-7 | 运营后台模拟器 | 活动/礼包/公告热配置校验 + 冲突检测 | [x] `tools/opcheck`：跨表排期冲突（同组同优先级=错误、可按 priority 裁决=提示）、同道具礼包重叠=错误、空窗/超并发=提示；14 例；verify-all 第 7 层 |
-| T7-8 | 本地化语音/字幕 | 语音 key 与字幕时间轴、缺语言回退 | [ ] |
+| T7-8 | 本地化语音/字幕 | 语音 key 与字幕时间轴、缺语言回退 | [x] `Feature.VoiceOver` + `TbVoiceLine`(8 行 3 语言) 左闭右开字幕时间轴、缺语言回退；tablecheck 复合主键规则；Console `[VoiceOver]`、宿主 `VoiceOver` 已接 |
 | T7-9 | 性能基线回归 | PlayMode 帧耗时/分配阈值 + 回归报告 | [x] `PerformanceBudget`（平均/P95/分配 + 固定格式 [Perf] 报告行，宽松预算防跨机假红）14 例 + PlayMode 实测报告 |
 | T7-10 | 错误上报与降级面板 | 崩溃/异常聚合 + 一键上报假实现 | [x] `ErrorReportAggregator`（窗口去重、Fatal 立即上报、失败保留重试、容量只挤 Warning）+ 双端假通道；19 例；Console `[ErrorReport]` 已接 |
 ---

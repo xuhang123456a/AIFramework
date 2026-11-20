@@ -142,6 +142,10 @@ namespace AIFramework.Tests.EditMode
 
             // 限时礼包表必须装配；社交假后端要能赠送/领取（本地模拟）。
             Assert.IsTrue(host.LimitedOfferAvailable, "限时礼包缺表：TbLimitedOffer.bin。");
+
+            // 语音字幕表必须装配；迁移服务必须可构造（游客档缺失时返回失败而不是抛）。
+            Assert.IsTrue(host.VoiceOverAvailable, "语音字幕缺表：TbVoiceLine.bin。");
+            Assert.IsNotNull(host.SaveMigration, "存档迁移服务必须已装配。");
             Assert.Greater(host.Friends.Social.GetFriends().Length, 0, "假社交后端应至少有 1 个好友。");
 
             // 推送：假后端能授权、登记 token、排一条每日提醒。

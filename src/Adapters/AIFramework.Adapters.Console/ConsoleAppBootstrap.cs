@@ -9,6 +9,7 @@ using AIFramework.Core.Gameplay;
 using AIFramework.Contracts.Services;
 using AIFramework.Core.Meta;
 using AIFramework.Core.Replay;
+using AIFramework.Core.Save;
 using AIFramework.Core.Services;
 using AIFramework.Features.Achievement;
 using AIFramework.Features.ActivitySchedule;
@@ -18,6 +19,7 @@ using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
 using AIFramework.Features.LimitedOffer;
 using AIFramework.Features.Localization;
+using AIFramework.Features.VoiceOver;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
 using AIFramework.Features.SeasonPass;
@@ -100,6 +102,8 @@ namespace AIFramework.Adapters.Console
             WireReconcile();
             WireResourceManifest();
             WireLeaderboardPager();
+            WireVoiceOver();
+            WireSaveMigration();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -352,6 +356,54 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>
+        /// 游客档迁移演示：先造一份"游客档"（备份槽写 AISV 包络），再迁移到账号槽位。
+        /// <para>用真实字节（SaveService 写、SaveMigrationService 读）而不是空跑假数据。</para>
+        /// </summary>
+        private void WireSaveMigration()
+        {
+            var seeder = new SaveService(_storage, "migrate-seed");
+            byte[] payload = InventorySaveCodec.Encode(new[]
+            {
+                new InventoryEntrySnapshot(1001, 30),
+                new InventoryEntrySnapshot(2001, 2),
+            });
+            seeder.Save(0, new SaveEnvelope(SaveService.CurrentVersion, payload));
+            byte[]? guestBytes = _storage.Read(seeder.Key(0));
+            if (guestBytes != null)
+            {
+                _storage.Write("save.guest", guestBytes);
+            }
+
+            var migration = new SaveMigrationService(_storage, _time, "save");
+            SaveMigrationResult result = migration.MigrateGuestToAccount(new SaveMigrationRequest(
+                guestSlotKey: "guest",
+                targetSlotKey: "account-10001",
+                policy: SaveMergePolicy.UnionBest,
+                keepGuestBackup: true));
+
+            _writer.WriteLine("[SaveMigrate] 成功=" + result.Success + " 条目=" + result.MergedEntries
+                + " 目标=" + result.TargetSlotKey + " 备份=" + result.BackupSlotKey
+                + (result.Success ? string.Empty : " 原因=" + result.Reason));
+        }
+
+        /// <summary>语音字幕接线：表驱动语音行 + 语言回退 + 字幕时间轴推进（不真的播放音频）。</summary>
+        private void WireVoiceOver()
+        {
+            var voice = new VoiceOverHandler(_bus, _tables);
+            voice.Register(_bus);
+
+            VoiceOverSnapshot snapshot = voice.Snapshot();
+            int lineId = snapshot.Lines.Length > 0 ? snapshot.Lines[0].LineId : 0;
+            bool played = voice.Play(lineId);
+            voice.Tick(120);
+
+            VoiceOverSnapshot after = voice.Snapshot();
+            _writer.WriteLine("[VoiceOver] 行数=" + snapshot.Lines.Length
+                + " 播放=" + played + " 当前行=" + after.CurrentLineId
+                + " 播放中=" + after.IsPlaying + " 字幕=" + (after.Lines.Length > 0 && after.Lines[0].HasSubtitle));
         }
 
         /// <summary>排行榜分页接线：假服务端排序 → pager 归一化 → 取自己所在页。</summary>
