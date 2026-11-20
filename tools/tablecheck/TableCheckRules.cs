@@ -99,7 +99,13 @@ namespace AIFramework.TableCheck
                     case "TbTycoonBuilding":
                         CheckBuilding(pair.Key, pair.Value, issues);
                         break;
-                    case "TbExperiment":
+                    case "TbActivitySchedule":
+                    CheckActivitySchedule(pair.Value, issues);
+                    break;
+                case "TbLimitedOffer":
+                    CheckLimitedOffer(pair.Value, issues);
+                    break;
+                case "TbExperiment":
                     CheckExperiment(pair.Value, issues);
                     break;
                 case "TbIdleStage":
@@ -270,6 +276,110 @@ namespace AIFramework.TableCheck
         }
 
         /// <summary>
+        /// 活动排期：时间窗口正序、reset 小时 0..23、轮换组非负。
+        /// <para>
+        /// <b>为什么窗口必须查</b>：start == end 时活动永远不开启（左闭右开），运营会以为"配了却看不到"；
+        /// 反向窗口同样静默失效。这两类错误在 JSON 里完全不显眼，只能靠体检拦。
+        /// </para>
+        /// </summary>
+        private static void CheckActivitySchedule(TableData table, List<TableIssue> issues)
+        {
+            CheckUniqueIntColumn(table, "activityId", issues);
+
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                int? start = GetInt(table, i, "startUnixSeconds");
+                int? end = GetInt(table, i, "endUnixSeconds");
+                if (start.HasValue && end.HasValue && end.Value <= start.Value)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "endUnixSeconds",
+                        "结束时间必须晚于开始时间（相等时活动永远不开启）"));
+                }
+
+                CheckUnixSecond(table, i, "startUnixSeconds", start, issues);
+                CheckUnixSecond(table, i, "endUnixSeconds", end, issues);
+
+                int? resetHour = GetInt(table, i, "dailyResetHourUtc");
+                if (resetHour.HasValue && (resetHour.Value < 0 || resetHour.Value > 23))
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "dailyResetHourUtc",
+                        "每日重置小时必须落在 0..23"));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 限时礼包：时间窗口正序、折扣 1..100、限购非负、售价为正。
+        /// <para>
+        /// 折扣 0 会让 finalPrice 恒为 1（玩家花 1 金币买光），>100 则变成加价；
+        /// 两类都应该在导表阶段红灯，而不是上线后靠客服退款。
+        /// </para>
+        /// </summary>
+        private static void CheckLimitedOffer(TableData table, List<TableIssue> issues)
+        {
+            CheckUniqueIntColumn(table, "offerId", issues);
+
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                int? discount = GetInt(table, i, "discountPercent");
+                if (discount.HasValue && (discount.Value < 1 || discount.Value > 100))
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "discountPercent",
+                        "折扣必须在 1..100（0 会让售价恒为 1，>100 变成加价）"));
+                }
+
+                int? original = GetInt(table, i, "originalPrice");
+                if (original.HasValue && original.Value <= 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "originalPrice", "原价必须为正"));
+                }
+
+                int? grant = GetInt(table, i, "grantCount");
+                if (grant.HasValue && grant.Value <= 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "grantCount", "发放数量必须为正"));
+                }
+
+                int? daily = GetInt(table, i, "dailyLimit");
+                int? total = GetInt(table, i, "totalLimit");
+                if (daily.HasValue && daily.Value < 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "dailyLimit", "每日限购不能为负"));
+                }
+
+                if (total.HasValue && total.Value < 0)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "totalLimit", "总限购不能为负"));
+                }
+
+                int? start = GetInt(table, i, "startUnixSeconds");
+                int? end = GetInt(table, i, "endUnixSeconds");
+                if (start.HasValue && end.HasValue && end.Value <= start.Value)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "endUnixSeconds",
+                        "结束时间必须晚于开始时间（相等时礼包永远不可购）"));
+                }
+
+                // 折后价 floor 后为 0：客户端会夹到 1，等于白送——这是最容易上线后才发现的一类配置事故。
+                if (original.HasValue && discount.HasValue && (long)original.Value * discount.Value < 100L)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "discountPercent",
+                        "折后价向下取整后为 0（客户端会夹到 1，等于白送）"));
+                }
+
+                // 日限 > 总限：日限购形同虚设（总限先耗尽）。
+                if (daily.HasValue && total.HasValue && total.Value > 0 && daily.Value > total.Value)
+                {
+                    issues.Add(new TableIssue(table.Schema.TableName, i, "dailyLimit",
+                        "每日限购大于总限购（总限会先耗尽，日限设置失去意义）"));
+                }
+
+                // int32 Unix 秒上限：2038-01-19 之后溢出为负，窗口会静默失效。
+                CheckUnixSecond(table, i, "startUnixSeconds", start, issues);
+                CheckUnixSecond(table, i, "endUnixSeconds", end, issues);
+            }
+        }
+        /// <summary>
         /// A/B 实验：主键唯一、key 唯一非空、流量 0..100、enabled 只能 0/1。
         /// <para>
         /// <b>为什么这些必须拦</b>：trafficPercent 越界会让分桶静默退化（比如 150 变成"全 B"、
@@ -309,6 +419,15 @@ namespace AIFramework.TableCheck
                 {
                     issues.Add(new TableIssue(table.Schema.TableName, i, "key", "key 不能为空（分桶哈希依赖它）"));
                 }
+            }
+        }
+        /// <summary>int32 Unix 秒必须为正且在 2038 年前（溢出为负会让时间窗口静默失效）。</summary>
+        private static void CheckUnixSecond(TableData table, int rowIndex, string columnName, int? value, List<TableIssue> issues)
+        {
+            if (value.HasValue && value.Value <= 0)
+            {
+                issues.Add(new TableIssue(table.Schema.TableName, rowIndex, columnName,
+                    "Unix 秒必须为正（int32 溢出/未配置都会让时间窗口静默失效）"));
             }
         }
         /// <summary>字符串列唯一性（空值跳过，空值由各表自己的规则判）。</summary>

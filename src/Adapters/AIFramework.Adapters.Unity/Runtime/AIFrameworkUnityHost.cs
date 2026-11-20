@@ -20,6 +20,7 @@ using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
 using AIFramework.Features.Inventory;
+using AIFramework.Features.LimitedOffer;
 using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
 using AIFramework.Features.Quest;
@@ -104,6 +105,12 @@ namespace AIFramework.Adapters.Unity
         private readonly ErrorToastRouter _toastRouter;
 
         private readonly AccountSessionManager _accountSession;
+
+        private readonly UnitySocialService _social;
+
+        private readonly FriendService _friends;
+
+        private readonly LimitedOfferHandler? _limitedOffers;
 
         private readonly ExperimentHandler? _experiment;
 
@@ -276,9 +283,26 @@ namespace AIFramework.Adapters.Unity
             {
                 _experiment = null;
                 _logger.Error("A/B 实验装配失败（TbExperiment.bin 缺失或损坏），已跳过：" + exception.Message);
+            }
+            // 限时礼包：表缺失时同样降级（不让一个礼包表把整个宿主启动搞崩）。
+            try
+            {
+                var offers = new LimitedOfferHandler(_bus, _time, _tableLoader);
+                offers.Register(_bus);
+                _limitedOffers = offers;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _limitedOffers = null;
+                _logger.Error("限时礼包装配失败（TbLimitedOffer.bin 缺失或损坏），已跳过：" + exception.Message);
             }            _toastPresenter = new UnityToastPresenter(_logger);
             _toastRouter = new ErrorToastRouter(_bus, _toastPresenter);
             _accountSession = new AccountSessionManager(new UnityAccountService(_storage, _time, available: true), _time);
+            _social = new UnitySocialService(_storage, _time, available: true);
+            _friends = new FriendService(_social, _time);
             _inventory = new InventoryHandler();
             _redDots = new RedDotTree();
             _popups = new PopupQueue();
@@ -360,6 +384,39 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>好友服务（本地假社交后端：赠送/领取体力，跨日重置走时间端口）。</summary>
+        public FriendService Friends
+        {
+            get { return _friends; }
+        }
+
+        /// <summary>社交后端（诊断/演示用；真实实现接平台好友链）。</summary>
+        public UnitySocialService Social
+        {
+            get { return _social; }
+        }
+
+        /// <summary>限时礼包是否装配成功（表缺失时降级为 false）。</summary>
+        public bool LimitedOfferAvailable
+        {
+            get { return _limitedOffers != null; }
+        }
+
+        /// <summary>限时礼包查询入口；未装配时抛 <see cref="InvalidOperationException"/>。</summary>
+        public LimitedOfferHandler LimitedOffers
+        {
+            get
+            {
+                LimitedOfferHandler? current = _limitedOffers;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("限时礼包尚未装配成功（TbLimitedOffer.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
         }
 
         /// <summary>账号会话（游客静默登录 + TTL 过期；Phase 1 由本地模拟后端提供）。</summary>

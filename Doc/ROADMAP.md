@@ -117,15 +117,15 @@
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
 | T6-1 | 账号与登录端口 | `IAccountService`（游客/第三方绑定/登出/换号）+ 假实现 + 会话失效处理 | [x] `AccountSessionManager` + 双端假后端 + TTL 过期；Console `[Account]`、宿主 `Account` 已接 |
-| T6-2 | 社交端口 | `IFriendService`（好友列表/赠送体力/领取）本地台账 | [ ] |
+| T6-2 | 社交端口 | `ISocialService`（好友列表/赠送/领取体力）+ 双端假后端 + 每日限量跨日重置；Console `[Social]`、宿主 `Friends` 已接 |
 | T6-3 | 推送端口 | `IPushService`（本地通知/远端 token 登记）+ 假实现 | [ ] |
 | T6-4 | A/B 实验框架 | 分桶（确定性哈希）+ 实验表 + 曝光埋点 | [x] `Feature.Experiment` + `TbExperiment`(6 实验) + FNV 分桶 53 例；tablecheck 新规则 4 例；Console `[Experiment]` 已接 |
-| T6-5 | 限时礼包/折扣 | 商店切片扩展：时间段 + 折扣 + 限购 | [ ] |
-| T6-6 | 回放分享/导出 | 录像导出为可分享文件 + 导入回放列表 | [ ] |
+| T6-5 | 限时礼包/折扣 | 时间段 + 折扣 + 限购 | [x] `Feature.LimitedOffer` + `TbLimitedOffer`(6 礼包) 54 例；成交只发 `GrantItemCommand`、扣款交装配层；Console `[LimitedOffer]` 已接 |
+| T6-6 | 回放分享/导出 | 录像导出可分享文本 + 导入 | [x] `ReplaySharing`（AIFR-SHARE 信封 + FNV 校验和，截断/篡改/超长全拒）15 例；Console `[ReplayShare]` 已接 |
 | T6-7 | 引导高亮 UI | 大厅 HUD 订阅 Guide 事件做目标高亮/箭头 | [ ] |
 | T6-8 | 多语言热切换 | 运行时切语言刷新已打开面板（不靠重启场景） | [ ] |
 | T6-9 | 错误码与提示映射 | 统一错误码 → 本地化 key → Toast，替代散落字符串 | [x] `ErrorCatalog`(15 码) + `ErrorToastRouter` + `ToastRequestedEvent` + 双端 Toast 表现层；22 例 |
-| T6-10 | 运营校验工具 | `tablecheck` 扩展：活动/礼包时间窗口与重叠检查 | [ ] |
+| T6-10 | 运营校验工具 | `tablecheck` 扩展：活动/礼包窗口与折扣检查 | [x] 新增 TbActivitySchedule / TbLimitedOffer / TbExperiment 规则 + 折后价为 0 / 日限>总限 / int32 时间溢出；32 例 |
 ---
 
 ## 轮次日志（每轮追加，最新在上）

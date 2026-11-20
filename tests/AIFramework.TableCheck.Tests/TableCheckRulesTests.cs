@@ -15,6 +15,84 @@ namespace AIFramework.TableCheck.Tests
     public sealed class TableCheckRulesTests
     {
         [Fact]
+        public void LimitedOffer_FinalPriceFloorsToZero_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,10,1,99,1,1000,2000,1,10");
+
+            Assert.Contains(issues, issue => issue.Column == "discountPercent" && issue.Message.Contains("白送"));
+        }
+
+        [Fact]
+        public void LimitedOffer_DailyLimitExceedsTotalLimit_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,10,1,100,50,1000,2000,5,2");
+
+            Assert.Contains(issues, issue => issue.Column == "dailyLimit");
+        }
+
+        [Fact]
+        public void LimitedOffer_NonPositiveUnixSeconds_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,10,1,100,50,-5,2000,1,10");
+
+            Assert.Contains(issues, issue => issue.Column == "startUnixSeconds");
+        }
+        [Fact]
+        public void ActivitySchedule_ReversedWindow_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbActivitySchedule",
+                "activityId,name,startUnixSeconds,endUnixSeconds,dailyResetHourUtc,rotationGroup,priority",
+                "1,活动A,2000,1000,0,1,0");
+
+            Assert.Contains(issues, issue => issue.Column == "endUnixSeconds");
+        }
+
+        [Fact]
+        public void ActivitySchedule_InvalidResetHour_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbActivitySchedule",
+                "activityId,name,startUnixSeconds,endUnixSeconds,dailyResetHourUtc,rotationGroup,priority",
+                "1,活动A,1000,2000,24,1,0");
+
+            Assert.Contains(issues, issue => issue.Column == "dailyResetHourUtc");
+        }
+
+        [Fact]
+        public void LimitedOffer_ZeroDiscount_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,10,1,100,0,1000,2000,1,10");
+
+            Assert.Contains(issues, issue => issue.Column == "discountPercent");
+        }
+
+        [Fact]
+        public void LimitedOffer_ReversedWindow_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,10,1,100,50,2000,1000,1,10");
+
+            Assert.Contains(issues, issue => issue.Column == "endUnixSeconds");
+        }
+
+        [Fact]
+        public void LimitedOffer_NonPositiveGrant_IsReported()
+        {
+            List<TableIssue> issues = ValidateSingle("TbLimitedOffer",
+                "offerId,name,itemId,grantCount,priceItemId,originalPrice,discountPercent,startUnixSeconds,endUnixSeconds,dailyLimit,totalLimit",
+                "1,礼包,1001,0,1,100,50,1000,2000,1,10");
+
+            Assert.Contains(issues, issue => issue.Column == "grantCount");
+        }
+        [Fact]
         public void RepoTables_AreHealthy()
         {
             string repoRoot = FindRepoRoot();

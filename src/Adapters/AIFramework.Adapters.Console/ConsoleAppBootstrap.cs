@@ -16,6 +16,7 @@ using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
 using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
+using AIFramework.Features.LimitedOffer;
 using AIFramework.Features.Localization;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
@@ -92,6 +93,8 @@ namespace AIFramework.Adapters.Console
             WireErrorToast();
             WireAccount();
             WireExperiment();
+            WireLimitedOffers();
+            WireSocial();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -315,6 +318,50 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>社交接线：赠送/领取体力，跨日重置由时间驱动（假社交后端，不联网）。</summary>
+        private void WireSocial()
+        {
+            var social = new ConsoleSocialService(_time, friendCount: 3);
+            var friends = new FriendService(social, _time, maxGiftPerDay: 2);
+
+            FriendOperationOutcome gift = friends.GiftStamina("friend-1");
+            int claimed = friends.ClaimAllStamina();
+            FriendOperationOutcome duplicate = friends.GiftStamina("friend-1");
+
+            _writer.WriteLine("[Social] 好友=" + social.FriendCount
+                + " 赠送=" + gift.Success + " 领取=" + claimed
+                + " 重复赠送=" + duplicate.Result
+                + " 今日赠送剩余=" + friends.DailyGiftRemaining);
+        }
+
+        /// <summary>限时礼包接线：窗口/折扣/限购由切片裁决，成交后经 GrantItemCommand 发货。</summary>
+        private void WireLimitedOffers()
+        {
+            var offers = new LimitedOfferHandler(_bus, _time, _tables);
+            offers.Register(_bus);
+
+            LimitedOfferSnapshot snapshot = _bus.Query<LimitedOfferQueryRequest, LimitedOfferSnapshot>(new LimitedOfferQueryRequest());
+
+            // 演示选"当前可买"的第一单：表里刻意同时配了已结束/进行中/未开始三种窗口，
+            // 直接取第 0 行会拿到已结束的礼包，看到 NotOpen 反而像功能坏了。
+            int firstId = 0;
+            for (int i = 0; i < snapshot.Offers.Length; i++)
+            {
+                if (snapshot.Offers[i].IsOpen && snapshot.Offers[i].TotalRemaining > 0)
+                {
+                    firstId = snapshot.Offers[i].OfferId;
+                    break;
+                }
+            }
+
+            LimitedOfferPurchaseOutcome bought = offers.Purchase(firstId);
+            LimitedOfferPurchaseOutcome again = offers.Purchase(firstId);
+
+            _writer.WriteLine("[LimitedOffer] 可买=" + snapshot.OpenCount + "/" + snapshot.Offers.Length
+                + " 首单=" + bought.Result + " 价=" + bought.FinalPrice + "x" + bought.GrantCount
+                + " 再买=" + again.Result);
+        }
+
         /// <summary>账号接线：游客静默登录 + 会话 TTL 过期演示（假后端，不联网）。</summary>
         private void WireAccount()
         {
@@ -394,9 +441,15 @@ namespace AIFramework.Adapters.Console
             int overlong = store.Save(kernelType: 1, levelId: 2, randomSeed: 20261120, script, new long[] { 1L }, now + 1).Length > 0 ? 1 : 0;
             bool deleted = store.Delete(key);
 
+            string shareText = ReplaySharing.Export(store.List().Length > 0 ? new byte[] { 1, 2, 3, 4, 5, 6 } : new byte[] { 9 });
+            bool imported = ReplaySharing.TryImport(shareText, out byte[]? sharedBack, out string shareReason);
+
             _writer.WriteLine("[Replay] 保存后列表=" + list.Length + " 读回=" + loaded
                 + " 帧数=" + (loaded ? fingerprints.Length : 0)
                 + " 再存=" + overlong + " 删除=" + deleted);
+            _writer.WriteLine("[ReplayShare] 导出=" + shareText.Length + " 字符 导入=" + imported
+                + " 字节=" + (sharedBack != null ? sharedBack.Length : 0)
+                + (imported ? string.Empty : " 原因=" + shareReason));
         }
 
         /// <summary>新手引导接线：表驱动步骤机；外部事实（进大厅/开商店/完成战斗）由适配层翻译成 trigger。</summary>

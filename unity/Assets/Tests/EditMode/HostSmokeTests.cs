@@ -139,6 +139,11 @@ namespace AIFramework.Tests.EditMode
             Assert.IsTrue(host.Account.EnsureSignedIn().IsSuccess, "游客静默登录应成功。");
             Assert.IsNotNull(host.ToastPresenter, "Toast 表现层必须已装配。");
 
+            // 限时礼包表必须装配；社交假后端要能赠送/领取（本地模拟）。
+            Assert.IsTrue(host.LimitedOfferAvailable, "限时礼包缺表：TbLimitedOffer.bin。");
+            Assert.IsTrue(host.Friends.GiftStamina("friend-1").Success, "给好友送体力应成功。");
+            Assert.True(host.Friends.ClaimAllStamina() > 0, "一键领取应拿到体力。");
+
             // 广告端口：未接真实 SDK 时必须如实不可用。
             Assert.IsFalse(host.Ads.IsAvailable, "广告端口未接 SDK，IsAvailable 必须是 false。");
 
