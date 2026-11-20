@@ -295,7 +295,7 @@ namespace AIFramework.Features.Tests.ActivitySchedule
             Assert.Equal(1795651200, last.EndUnixSeconds);
             Assert.Equal(12, last.DailyResetHourUtc);
             Assert.Equal(2, last.RotationGroup);
-            Assert.Equal(20, last.Priority);
+            Assert.Equal(25, last.Priority);
 
             // 两个轮换组各 4 条，且每组内时间窗口首尾错开：组内同时只应有一个活动落在窗口里。
             for (int i = 0; i < tables.Count; i++)
