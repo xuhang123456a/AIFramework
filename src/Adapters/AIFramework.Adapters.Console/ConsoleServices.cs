@@ -380,6 +380,20 @@ namespace AIFramework.Adapters.Console
                 + " 第二=" + top.Top[1].PlayerId + "(" + top.Top[1].Score + ")"
                 + " 自己名次=" + top.OwnRank + " 总数=" + top.TotalEntries);
 
+            var adTime = new SystemTimeProvider();
+            var adScheduler = new AdShowScheduler(adTime);
+            var ads = new ConsoleAdService(adScheduler, adTime);
+            AdShowResult adCompleted = ads.Show(new AdShowRequest(AdPlacement.RewardedVideo, 1));
+            AdShowResult adCooling = ads.Show(new AdShowRequest(AdPlacement.RewardedVideo, 1));
+            ads.SetNextCompletion(false);
+            AdShowResult adSkipped = ads.Show(new AdShowRequest(AdPlacement.RewardedVideo, 2));
+            writer.WriteLine(
+                "[Ad] 完播=" + adCompleted.State + "(奖=" + adCompleted.IsRewarded + ")"
+                + " 冷却=" + adCooling.State
+                + " 跳过=" + adSkipped.State + "(奖=" + adSkipped.IsRewarded + ")"
+                + " 剩余=" + adScheduler.RemainingRewardedToday
+                + " 事件=" + JoinEvents(ads.DrainLog()));
+
             var ledger = new MatchValidationLedger();
             var normal = new MatchSummary(
                 kernelType: 2, levelId: 1, randomSeed: 20261120, frameCount: 600, stateFingerprint: 0x5EEDL, score: 1200);

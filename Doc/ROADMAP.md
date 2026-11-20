@@ -80,10 +80,10 @@
 | # | 能力 | 说明 | 状态 |
 |---|---|---|---|
 | T4-1 | IAP 端口 | `IIapService`（商品目录/购买/收据校验/恢复购买）+ Console 假商店 + 双端测试 | [x] 契约 + 台账 + 双端实现 + 35 例；宿主 `Iap` 属性 + Console `[Iap]` 自检 |
-| T4-2 | 广告端口 | `IAdService`（激励视频/插屏/冷却）+ 假填充 + 完播奖励口径 | [ ] |
+| T4-2 | 广告端口 | `IAdService`（激励视频/插屏/冷却）+ 假填充 + 完播奖励口径 | [x] 契约 + `AdShowScheduler`（冷却/每日配额/UTC 跨日）+ 双端实现 + 47 例 + Console `[Ad]` 自检 |
 | T4-3 | 排行榜端口 | `ILeaderboardService`（提交/查询/自己排名）+ 本地台账 | [x] 契约 + `LeaderboardTable`（同分先到先排确定性）+ 双端实现 + 25 例 + Console `[Leaderboard]` 自检 |
 | T4-4 | 成就系统 | 切片：成就定义表 + 解锁判定 + 通知事件 + 无头测试 | [x] `Feature.Achievement` + `TbAchievement`(430B,12 行) + 38 例；宿主/Console 桥接已接 |
-| T4-5 | 活动/Battle Pass | 赛季配置 + 任务进度 + 奖励领取 + 时间源可快进 | [ ] |
+| T4-5 | 活动/Battle Pass | 赛季配置 + 任务进度 + 奖励领取 + 时间源可快进 | [x] `Feature.SeasonPass` + `TbSeasonPass`(724B,30 级) + 双轨领取 + 58 例；宿主/Console 已接 |
 | T4-6 | 埋点端口 | `IAnalyticsService`（零分配事件写法）+ Console 环形记录 | [x] 契约 + `AnalyticsEventBuffer`(零分配) + 双端实现 + 24 例 + Console `[Track]` 自检 |
 | T4-7 | 输入抽象 | 手柄/触屏/键鼠统一 `IInputSource`，让 Runner/Platformer 可换输入 | [ ] |
 | T4-8 | 大富翁玩法 | Turn 内核新卡带（骰子 + 事件格 + 资产），补 T2-8 未做的分支 | [x] 内核 50 例 + Controller/HUD/Scene（第 24 场景，PlayMode 冒烟过） |

@@ -12,6 +12,7 @@ using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
 using AIFramework.Features.Inventory;
 using AIFramework.Features.Quest;
+using AIFramework.Features.SeasonPass;
 using AIFramework.Kernel.Realtime;
 using System;
 using System.Collections.Generic;
@@ -78,6 +79,7 @@ namespace AIFramework.Adapters.Console
 
             WireInventory();
             WireAchievement();
+            WireSeasonPass();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
 
             _writer.WriteLine("今天天序号=" + signIn.TodayDayIndex + "，初始道具=" + DescribeInventory());
@@ -299,6 +301,36 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>赛季通行证接线：战斗结算经验由适配层桥接注入（切片间不互相引用）。</summary>
+        private void WireSeasonPass()
+        {
+            // 赛季终点本应服务端下发；演示固定一个 UTC 时刻（晚于时间源锚点）。
+            long seasonEndUnix = new DateTimeOffset(new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc)).ToUnixTimeSeconds();
+            var seasonPass = new SeasonPassHandler(_bus, _time, _tables, seasonEndUnix);
+            seasonPass.Register(_bus);
+            _bus.Subscribe(new BattleSeasonPassBridge(_bus));
+
+            _bus.Send(new AddSeasonXpCommand(120));
+            SeasonPassSnapshot snapshot = _bus.Query<SeasonPassQueryRequest, SeasonPassSnapshot>(new SeasonPassQueryRequest());
+            _writer.WriteLine("[Season] Lv." + snapshot.Level + " xp=" + snapshot.CurrentXp + "/" + snapshot.NextLevelXp
+                + " 可领=" + snapshot.ClaimableCount + " 剩余=" + snapshot.RemainingSeconds + "s");
+        }
+
+        private sealed class BattleSeasonPassBridge : IEventHandler<GameFinishedEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public BattleSeasonPassBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in GameFinishedEvent evt)
+            {
+                _bus.Send(new AddSeasonXpCommand(evt.IsVictory ? 120 : 40));
+            }
+        }
+
         /// <summary>成就切片接线：注册处理器 + 把"已发生的事实"翻译成计数命令。</summary>
         private void WireAchievement()
         {

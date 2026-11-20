@@ -20,6 +20,7 @@ using AIFramework.Features.Inventory;
 using AIFramework.Features.Localization;
 using AIFramework.Features.Mail;
 using AIFramework.Features.Quest;
+using AIFramework.Features.SeasonPass;
 using AIFramework.Features.Shop;
 
 namespace AIFramework.Adapters.Unity
@@ -93,6 +94,8 @@ namespace AIFramework.Adapters.Unity
 
         private readonly UnityIapService _iap;
 
+        private readonly UnityAdService _ads;
+
         /// <summary>内核工厂；宿主通过它 <c>Begin</c> 会话，再用 <see cref="UnityKernelFactory.LastRealtime"/> 拿战局引用。</summary>
         private readonly UnityKernelFactory _factory;
 
@@ -114,6 +117,29 @@ namespace AIFramework.Adapters.Unity
         private QuestHandler? _quests;
 
         private AchievementHandler? _achievements;
+
+        private SeasonPassHandler? _seasonPass;
+
+        /// <summary>赛季通行证是否装配成功（表缺失时降级为 false，不影响启动）。</summary>
+        public bool SeasonPassAvailable
+        {
+            get { return _seasonPass != null; }
+        }
+
+        /// <summary>赛季通行证查询入口；未装配时抛 <see cref="InvalidOperationException"/>。</summary>
+        public SeasonPassHandler SeasonPass
+        {
+            get
+            {
+                SeasonPassHandler? current = _seasonPass;
+                if (current == null)
+                {
+                    throw new InvalidOperationException("赛季通行证尚未装配成功（TbSeasonPass.bin 缺失或损坏）。");
+                }
+
+                return current;
+            }
+        }
 
         /// <summary>成就切片是否装配成功（表缺失时降级为 false，不影响启动）。</summary>
         public bool AchievementAvailable
@@ -192,6 +218,7 @@ namespace AIFramework.Adapters.Unity
             _spatial = new UnitySpatialQuery(spatialBufferCapacity, spatialLayerMask);
             _vfx = new UnityVfxService(_logger);
             _iap = new UnityIapService(storage: _storage, storeId: "purchases");
+            _ads = new UnityAdService(_time, available: false);
             _tableLoader = tableLoader ?? new UnityStreamingAssetsTableLoader(_assets, TableRelativeDirectory);
 
             // 工厂要拿表加载器组卡牌，所以它必须在表加载器之后构造。
@@ -279,6 +306,12 @@ namespace AIFramework.Adapters.Unity
         public UnityIapService Iap
         {
             get { return _iap; }
+        }
+
+        /// <summary>广告端口；接真实 SDK 前 IsAvailable 恒为 false，调用方必须先判 IsAvailable。</summary>
+        public UnityAdService Ads
+        {
+            get { return _ads; }
         }
 
         public UnitySpatialQuery Spatial
@@ -468,6 +501,25 @@ namespace AIFramework.Adapters.Unity
             {
                 _achievements = null;
                 _logger.Error("成就切片装配失败（TbAchievement.bin 缺失或损坏），已跳过：" + exception.Message);
+            }
+        }
+        // 赛季通行证：与成就同样的"表缺失降级"策略；赛季终点暂时固定（真实项目由服务端下发）。
+        if (_seasonPass == null)
+        {
+            try
+            {
+                long seasonEndUnix = new DateTimeOffset(new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc)).ToUnixTimeSeconds();
+                var seasonPass = new SeasonPassHandler(_bus, _time, _tableLoader, seasonEndUnix);
+                seasonPass.Register(_bus);
+                _seasonPass = seasonPass;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                || exception is InvalidDataException
+                || exception is IOException
+                || exception is ArgumentException)
+            {
+                _seasonPass = null;
+                _logger.Error("赛季通行证装配失败（TbSeasonPass.bin 缺失或损坏），已跳过：" + exception.Message);
             }
         }
         if (_mails == null)

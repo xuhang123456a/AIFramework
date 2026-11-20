@@ -32,7 +32,7 @@ namespace AIFramework.Adapters.Tests.Services
                 _output.WriteLine(line);
             }
 
-            // 自检行数：Audio×2 + Vfx + Track + Validate（新增服务都会追加一行，这里是"接线完整"的护栏）。`n            Assert.Equal(7, writer.Lines.Count);
+            // 自检行数：Audio×2 + Vfx + Track + Validate（新增服务都会追加一行，这里是"接线完整"的护栏）。`n            Assert.Equal(8, writer.Lines.Count);
 
             // 第 1 行：Master/Bgm 按设置值，Sfx 传 2f 必须被夹成 1.00，Voice 未设过保持默认 1.00。
             Assert.StartsWith("[Audio] 音量", writer.Lines[0]);
@@ -69,13 +69,19 @@ namespace AIFramework.Adapters.Tests.Services
             Assert.Contains("第一=2(3400)", writer.Lines[5]);
             Assert.Contains("自己名次=2", writer.Lines[5]);
 
-            // 第 7 行：正常接受、重复指纹拒绝、离谱分数拒绝；被拒的不登记，所以台账只有 1 条。
-            Assert.StartsWith("[Validate]", writer.Lines[6]);
-            Assert.Contains("正常=Accepted", writer.Lines[6]);
-            Assert.Contains("分=1200", writer.Lines[6]);
-            Assert.Contains("重复=Rejected(duplicate)", writer.Lines[6]);
-            Assert.Contains("离谱分数=Rejected(score exceeds plausible maximum)", writer.Lines[6]);
-            Assert.Contains("已登记=1/256", writer.Lines[6]);
+            // 第 7 行：广告端口：完播发奖、同广告位冷却、跳过不发奖。
+            Assert.StartsWith("[Ad]", writer.Lines[6]);
+            Assert.Contains("完播=Shown(奖=True)", writer.Lines[6]);
+            Assert.Contains("冷却=CoolingDown", writer.Lines[6]);
+            Assert.Contains("跳过=Skipped(奖=False)", writer.Lines[6]);
+
+            // 第 8 行：正常接受、重复指纹拒绝、离谱分数拒绝；被拒的不登记，所以台账只有 1 条。
+            Assert.StartsWith("[Validate]", writer.Lines[7]);
+            Assert.Contains("正常=Accepted", writer.Lines[7]);
+            Assert.Contains("分=1200", writer.Lines[7]);
+            Assert.Contains("重复=Rejected(duplicate)", writer.Lines[7]);
+            Assert.Contains("离谱分数=Rejected(score exceeds plausible maximum)", writer.Lines[7]);
+            Assert.Contains("已登记=1/256", writer.Lines[7]);
         }
 
         [Fact]
