@@ -317,6 +317,11 @@ namespace AIFramework.Adapters.Console
             _bus.Send(new GuideTriggerCommand(1, 0));
             _bus.Send(new GuideAdvanceCommand(2));
             _bus.Send(new GuideTriggerCommand(2, 0));
+            _bus.Send(new GuideAdvanceCommand(3));
+
+            // 完成一场战斗由事件桥接驱动（切片间不互相引用）。
+            _bus.Subscribe(new BattleGuideBridge(_bus));
+            _bus.Publish(new GameFinishedEvent(GameplayKernelType.Turn, 1, isVictory: true));
 
             GuideSnapshot snapshot = _bus.Query<GuideQueryRequest, GuideSnapshot>(new GuideQueryRequest());
             _writer.WriteLine("[Guide] 当前=" + snapshot.StepId + "(" + snapshot.Title + ")"
@@ -357,6 +362,21 @@ namespace AIFramework.Adapters.Console
             SeasonPassSnapshot snapshot = _bus.Query<SeasonPassQueryRequest, SeasonPassSnapshot>(new SeasonPassQueryRequest());
             _writer.WriteLine("[Season] Lv." + snapshot.Level + " xp=" + snapshot.CurrentXp + "/" + snapshot.NextLevelXp
                 + " 可领=" + snapshot.ClaimableCount + " 剩余=" + snapshot.RemainingSeconds + "s");
+        }
+
+        private sealed class BattleGuideBridge : IEventHandler<GameFinishedEvent>
+        {
+            private readonly ICqeBus _bus;
+
+            public BattleGuideBridge(ICqeBus bus)
+            {
+                _bus = bus;
+            }
+
+            public void Handle(in GameFinishedEvent evt)
+            {
+                _bus.Send(new GuideTriggerCommand(GuideTriggers.BattleFinished, evt.LevelId));
+            }
         }
 
         private sealed class BattleSeasonPassBridge : IEventHandler<GameFinishedEvent>
