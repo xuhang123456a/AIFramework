@@ -105,6 +105,10 @@ namespace AIFramework.TableCheck
                 case "TbLimitedOffer":
                     CheckLimitedOffer(pair.Value, issues);
                     break;
+                case "TbSkill":
+                    // 复合主键 (skillId, level)：同技能多等级会重复 skillId，通用"*Id 唯一"规则会误报。
+                    // TbVoiceLine 用专用规则，这里连专用规则都懒得写——列区间校验由 tools/skillcheck 做。
+                    break;
                 case "TbVoiceLine":
                     CheckVoiceLine(pair.Value, issues);
                     break;

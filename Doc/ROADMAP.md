@@ -154,13 +154,13 @@
 |---|---|---|---|
 | T8-1 | 战斗 AI 行为树 | 数据驱动行为树 + 决策仲裁 | [x] `BehaviorTree`（Selector/Sequence/Condition/Action，环检测/深度上限/零分配）+ `ArenaEnemyAi` 接线；Core 58 例 |
 | T8-2 | 波次/关卡节奏编辑器 | 波次时间轴 + 难度曲线校验 | [x] `TbArenaWave`(10 波) + `tools/wavecheck`（难度单调/节奏突变/奖励脱钩/Boss 规则）+ ArenaController 表驱动回退；47 例；verify-all 第 8 层 |
-| T8-3 | 技能数据编辑器 | 技能配置表 + 效果组合校验 | [ ] |
+| T8-3 | 技能数据编辑器 | 技能配置表 + 效果组合校验 | [x] `TbSkill`(4 技能×3 级) + `tools/skillcheck`（复合主键/成长/冷却/效果一致性）；50 例；verify-all 第 10 层 |
 | T8-4 | 经济模拟器 | 掉落/消耗模拟 + 通胀检测 | [x] `EconomySimulator`（净流入/回收率/道具囤积三指标 + 固定 [Economy] 报告行）16 例；Console 30 天实测回收率 62.5% 非通胀 |
 | T8-5 | 存档加密与防篡改 | 密钥派生 + 签名 + 迁移兼容 | [x] `SaveProtector`（HMAC-SHA256 + KCV 判"密钥错 vs 内容被改"、52 字节容器、先认证后解析）+ 61 例 |
 | T8-6 | 玩家数据看板 | 本地指标聚合 + CSV 导出 | [x] `PlayerMetrics`（会话/胜场/购买/广告/软货币/DAU 连续天数）+ `ConsoleMetricsExport`（追加不丢表头）；82 例；Console 实测 CSV 行 |
-| T8-7 | 自走棋 AI 对手 | 棋子摆放与升级策略 | [ ] |
+| T8-7 | 自走棋 AI 对手 | 棋子摆放与升级策略 | [x] `AutoChessAi`（凑三星→补前排→升人口→经济管理→低血搜牌，IRandomSource 确定性）+ 控制器接管开关；49 例 |
 | T8-8 | 三消难度评分 | 关卡可解性与难度估计 | [x] `Match3DifficultyEvaluator`（只吃 int[] 网格、可行手计数、死局/难度分/[Match3] 报告行）11 例 |
-| T8-9 | 引导自动演示 | 引导脚本录制/回放 | [ ] |
+| T8-9 | 引导自动演示 | 引导脚本录制/回放 | [x] `GuideDemoScript`（JSON 编解码，零第三方依赖）+ `GuideDemoPlayer`（延迟驱动、失败不中断）；18 例；Console `[GuideDemo]` 3/3 步完成 |
 | T8-10 | 翻译导入导出 | 本地化 CSV/JSON 双向转换 + 冲突检测 | [x] `tools/locconvert`：key,zh,en,ja 双向转换、CSV 转义往返、冲突中止导入；19 例；verify-all 第 8 层 |
 ---
 

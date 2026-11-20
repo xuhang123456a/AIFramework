@@ -33,6 +33,9 @@ jobs:
       - name: 配置表 JSON 与已导出 .bin 一致（改 JSON 忘导出即失败）
         run: dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --check
 
+      - name: 技能表体检（成长/冷却/效果一致性）
+        run: dotnet run --project tools/skillcheck/SkillCheck.csproj --no-build -- --tables tables --check
+
       - name: 波次节奏体检（难度曲线/奖励节奏）
         run: dotnet run --project tools/wavecheck/WaveCheck.csproj --no-build -- --tables tables --check
 

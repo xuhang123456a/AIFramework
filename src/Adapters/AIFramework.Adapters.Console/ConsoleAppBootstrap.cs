@@ -47,6 +47,8 @@ namespace AIFramework.Adapters.Console
         private readonly RingCausalLog _log;
         private readonly SystemTimeProvider _time;
         private readonly DirectoryBinaryTableLoader _tables;
+
+        private GuideHandler? _guide;
         private readonly InventoryHandler _inventory;
         private readonly RedDotTree _redDots;
         private readonly MockSpatialWorld _spatial;
@@ -107,6 +109,7 @@ namespace AIFramework.Adapters.Console
             WireEconomySim();
             WireMatch3Difficulty();
             WirePlayerMetrics();
+            WireGuideDemo();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -359,6 +362,32 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>引导自动演示：脚本化"触发→推进"并按时间推进，验证演示链路可被数据驱动。</summary>
+        private void WireGuideDemo()
+        {
+            // 复用 WireGuide 里已注册的处理器：同一总线重复注册会抛 InvalidOperationException。
+            GuideHandler? guide = _guide;
+            if (guide == null)
+            {
+                _writer.WriteLine("[GuideDemo] 引导未装配，跳过。");
+                return;
+            }
+
+            var script = new GuideDemoScript("console-demo", new[]
+            {
+                new GuideDemoStep(kind: 0, value: 0, targetId: 0, delayMs: 0),
+                new GuideDemoStep(kind: 1, value: 1, targetId: 0, delayMs: 200),
+                new GuideDemoStep(kind: 0, value: 1, targetId: 0, delayMs: 200),
+            });
+
+            var player = new GuideDemoPlayer(_bus);
+            player.Start(in script);
+            player.Tick(1000);
+
+            _writer.WriteLine("[GuideDemo] 脚本=" + player.ScriptName + " 步=" + player.ExecutedSteps
+                + "/" + script.Steps.Length + " 完成=" + player.IsFinished);
         }
 
         /// <summary>玩家数据看板：喂几条埋点事件 → 聚合指标 → 导出单行 CSV（真实事件号）。</summary>
@@ -676,6 +705,7 @@ namespace AIFramework.Adapters.Console
         {
             var guide = new GuideHandler(_bus, _tables);
             guide.Register(_bus);
+            _guide = guide;
 
             // 演示四个触发点：启动 → 进大厅 → 打开商店 → 完成一场战斗。
             _bus.Send(new GuideTriggerCommand(0, 0));

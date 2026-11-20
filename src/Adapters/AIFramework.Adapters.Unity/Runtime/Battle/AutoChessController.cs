@@ -1,9 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using AIFramework.Contracts.Ai;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Gameplay.Turn;
 using AIFramework.Contracts.Meta;
+using AIFramework.Core.Ai;
 using UnityEngine;
 
 namespace AIFramework.Adapters.Unity.Battle
@@ -28,6 +30,11 @@ namespace AIFramework.Adapters.Unity.Battle
     /// 同步推完的（内核一次跑完 30 个 tick），没有"每秒推进多少"的节奏可供适配层决定；
     /// <see cref="Update"/> 只做一件事：发现对局结束就收口一次。
     /// </para>
+    /// <para>
+    /// <b>AI 接管开关</b>：<c>aiTakesOverRounds</c> 打开后，"开战"会先让 Core 的 <see cref="AutoChessAi"/>
+    /// 把备战席交出去，"下一回合"结算后会立刻接手下一轮；AI 的每条决策仍然被翻译成
+    /// <see cref="IAutoChessInput"/> 意图，本类不新增任何玩法规则（详见 <see cref="PlaceWithAi"/>）。
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class AutoChessController : MonoBehaviour
@@ -38,6 +45,9 @@ namespace AIFramework.Adapters.Unity.Battle
         /// </summary>
         private const int LevelId = 1;
 
+        /// <summary>玩家半场的前几行算"前排"：只用于喂给 AI 的前排标记，不参与任何规则判定。</summary>
+        private const int AutoChessFrontlineRows = 2;
+
         /// <summary>自走棋皮肤（渲染状态行与字符网格，本类不碰任何 UI 组件）。</summary>
         [SerializeField] private AutoChessHud hud = null!;
 
@@ -46,6 +56,19 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>开局玩家单位数（备战席人数）。<b>越界值不在这里夹</b>：内核自己夹到 1..3，适配层不复制这份规则。</summary>
         [SerializeField] private int initialUnitCount = 3;
+
+        /// <summary>
+        /// AI 接管回合：打开后"开战"会先让 <see cref="AutoChessAi"/> 完成本轮布阵，
+        /// 而"下一回合"在结算后会立刻接手下一轮（同样先布阵再开战）。
+        /// <para>
+        /// <b>为什么默认关闭</b>：自走棋场景首先是"人类可操作"的演示，AI 接管只是验证策略接线的开关；
+        /// 关掉它，三个按钮的行为与本功能合入前完全一致，也不构造任何 AI 实例。
+        /// </para>
+        /// </summary>
+        [SerializeField] private bool aiTakesOverRounds = false;
+
+        /// <summary>AI 决策器：开关打开后首次需要时构造，关闭时保持 <c>null</c>。</summary>
+        private AutoChessAi? _ai;
 
         /// <summary>宿主（总线/会话/日志/背包的唯一入口）；销毁时置空。</summary>
         private AIFrameworkUnityHost? _host;
@@ -102,6 +125,12 @@ namespace AIFramework.Adapters.Unity.Battle
             }
         }
 
+        /// <summary>AI 是否接管回合（Inspector 开关的只读镜像，供 HUD/调试确认当前模式）。</summary>
+        public bool AiTakesOverRounds
+        {
+            get { return aiTakesOverRounds; }
+        }
+
         /// <summary>
         /// 把备战席上的玩家单位全部放上己方半场。
         /// <para>
@@ -147,6 +176,127 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
+        /// AI 接管时的布阵：把只读视图投影成 <see cref="AutoChessState"/>，逐条取决策，
+        /// 把"上场"类决策翻译成 <see cref="IAutoChessInput.TryPlace"/>，直到 AI 不再要求上场。
+        /// <para>
+        /// <b>为什么投影里没有经济和商店</b>：Phase 1 的内核只有"棋子与格子"，没有金币/等级/刷新。
+        /// 因此备战席上的棋子以 <c>IsOwned = true</c> 的商店槽位投影（这正是契约里"已拥有"的表达方式），
+        /// 金币固定 0、经济下限设为 0——否则"攒钱"规则会把布阵永远挡在 Wait 上。
+        /// 于是 AI 在本场景里只会走"摆放"分支；买 / 卖 / 升人口 / 刷新保留给内核接上经济系统的那一天。
+        /// </para>
+        /// <para>
+        /// <b>为什么不用决策里的落点坐标</b>：内核的 <c>TryPlace</c> 自己按"己方半场第一个空格"扫描，
+        /// 顺序与 AI 的落点扫描（y 0→3、x 0→7）完全一致；适配层再挪一次只会多出一条可能与内核打架的规则。
+        /// 坐标先留在决策里，等内核开放"指定落点"再用。
+        /// </para>
+        /// </summary>
+        private void PlaceWithAi()
+        {
+            IAutoChessInput? input = _input;
+            IAutoChessReadView? view = _readView;
+            if (input == null || view == null || _collected || view.IsFinished)
+            {
+                return;
+            }
+
+            AutoChessAi ai = EnsureAi();
+            int placed = 0;
+            int playerSlots = view.PlayerUnitCount;
+
+            // 上界 = 槽位数：每次成功上场至少消耗一个备战席单位，失败立即 break，循环必然收敛。
+            for (int i = 0; i < playerSlots; i++)
+            {
+                AutoChessState state = BuildAiState(view);
+                AutoChessDecision decision = ai.Decide(in state);
+
+                if (decision.Action != AutoChessAiAction.Buy)
+                {
+                    break;
+                }
+
+                if (!input.TryPlace(decision.TargetUnitId))
+                {
+                    break;
+                }
+
+                placed++;
+            }
+
+            if (placed > 0)
+            {
+                RenderHud();
+
+                AIFrameworkUnityHost? host = _host;
+                if (host != null)
+                {
+                    host.Log.Info("[AutoChess] AI 布阵：本轮上场 " + placed + " 个，回合=" + RoundIndex
+                        + "，累计决策=" + ai.DecisionsMade);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 把内核只读视图投影成 AI 状态：已上场的棋子进 <see cref="AutoChessBoardUnit"/>，
+        /// 备战席棋子进 <see cref="AutoChessShopSlot"/>（<c>IsOwned = true</c>）。
+        /// <para>
+        /// <b>为什么成本填 0</b>：内核没有价格概念，填 0 表示"不涉及经济"；<c>IsOwned = true</c>
+        /// 让"补满棋盘"不会把这些棋子当成新牌，"差两张升星"让凑星规则也不会误触发。
+        /// </para>
+        /// </summary>
+        private static AutoChessState BuildAiState(IAutoChessReadView view)
+        {
+            int playerSlots = view.PlayerUnitCount;
+            var board = new List<AutoChessBoardUnit>(playerSlots);
+            var bench = new List<AutoChessShopSlot>(playerSlots);
+
+            for (int slot = 0; slot < playerSlots; slot++)
+            {
+                ChessUnitView unit = view.GetUnit(slot);
+                if (!unit.Alive)
+                {
+                    continue;
+                }
+
+                if (unit.X >= 0)
+                {
+                    // 前排口径 = 玩家半场的前两行（y = 0..1），只喂给 AI 的"超编卖谁"取舍。
+                    board.Add(new AutoChessBoardUnit(
+                        unit.UnitId, 0, 1, unit.X, unit.Y, unit.Y < AutoChessFrontlineRows));
+                }
+                else
+                {
+                    bench.Add(new AutoChessShopSlot(unit.UnitId, 0, true, 2));
+                }
+            }
+
+            return new AutoChessState(
+                gold: 0,
+                level: 1,
+                round: view.RoundIndex,
+                hp: view.PlayerHp,
+                boardCapacity: playerSlots,
+                board: board.ToArray(),
+                shop: bench.ToArray(),
+                streak: 0);
+        }
+
+        /// <summary>
+        /// 取 AI 实例（懒构造）。<b>经济下限 0</b>：Phase 1 适配层没有经济系统，
+        /// 攒钱规则不该拦住布阵（详见 <see cref="PlaceWithAi"/>）。
+        /// </summary>
+        private AutoChessAi EnsureAi()
+        {
+            AutoChessAi? ai = _ai;
+            if (ai == null)
+            {
+                ai = new AutoChessAi(economyFloor: 0);
+                _ai = ai;
+            }
+
+            return ai;
+        }
+
+        /// <summary>
         /// 开战：同步推完本轮战斗，返回时双方基地血量与胜负已经落定。
         /// <para>
         /// <b>为什么先 <c>Step</c> 再 <c>StartBattle</c></b>：<see cref="IGameplaySession.Step"/> 对内核算术无影响，
@@ -167,6 +317,12 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 // 内核重复开战是空操作；直接不调，免得日志里刷出一串"开了但没变"。
                 return;
+            }
+
+            if (aiTakesOverRounds)
+            {
+                // 先由 AI 把备战席交出去，再开战；人类已经手动布过阵时这一步自然空转。
+                PlaceWithAi();
             }
 
             _session?.Step(0f);
@@ -227,6 +383,12 @@ namespace AIFramework.Adapters.Unity.Battle
 
             host.Log.Info("[AutoChess] 进入下一回合：回合=" + RoundIndex
                 + " 我方HP=" + PlayerHp + " 敌方HP=" + EnemyHp);
+
+            if (aiTakesOverRounds)
+            {
+                // AI 接管：本轮布阵 + 开战一次做完，玩家只负责按节奏点"下一回合"。
+                StartBattle();
+            }
         }
 
         /// <summary>
@@ -272,6 +434,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _session = null;
             _readView = null;
             _input = null;
+            _ai = null;
             _collected = true;
 
             AIFrameworkUnityHost? host = _host;
@@ -301,6 +464,9 @@ namespace AIFramework.Adapters.Unity.Battle
             _readView = null;
             _input = null;
             _collected = false;
+
+            // 新一局：AI 的策略本身无状态，只把诊断计数清零（开关关闭时 _ai 为 null，空条件调用）。
+            _ai?.Reset();
 
             if (host.Sessions.HasActiveSession)
             {

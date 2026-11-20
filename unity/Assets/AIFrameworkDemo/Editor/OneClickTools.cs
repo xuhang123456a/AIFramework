@@ -60,20 +60,27 @@ namespace AIFramework.Demo.Editor
         /// </summary>
         private static readonly string[] ExpectedBinaryTables =
         {
+            "TbAchievement.bin",
+            "TbActivitySchedule.bin",
+            "TbArenaWave.bin",
             "TbBuilding.bin",
             "TbCard.bin",
+            "TbExperiment.bin",
             "TbGachaPool.bin",
+            "TbGuideStep.bin",
             "TbIdleStage.bin",
+            "TbLimitedOffer.bin",
             "TbLocalization.bin",
             "TbMail.bin",
             "TbMergeItem.bin",
             "TbQuest.bin",
+            "TbSeasonPass.bin",
             "TbShopItem.bin",
+            "TbSkill.bin",
             "TbSignInReward.bin",
             "TbTower.bin",
             "TbTycoonBuilding.bin",
-            "TbAchievement.bin",
-            "TbSeasonPass.bin"
+            "TbVoiceLine.bin"
         };
 
         /// <summary>
