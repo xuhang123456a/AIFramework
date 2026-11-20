@@ -96,7 +96,7 @@ namespace AIFramework.Features.Guide
     /// <para>
     /// 解析完成后行按 <see cref="GuideDef.StepId"/> 升序排列，并强制"从 1 连续"，
     /// 因此 <c>stepId = 下标 + 1</c> 恒成立——状态机的位图与 O(1) 定位都依赖这条不变量。
-    /// 步数上限 <see cref="MaxSteps"/>：存档位图是 <c>int</c>，超过就放不下。
+    /// 步数上限 <see cref="MaxSteps"/>（31）：存档位图是 <c>int</c>，最高位是符号位，超过就放不下。
     /// </para>
     /// </summary>
     public sealed class GuideTables
@@ -113,8 +113,11 @@ namespace AIFramework.Features.Guide
         /// <summary>一行的最小可读字节数：6 个 int32（title / hint 每个至少 4 字节长度前缀）。</summary>
         private const int MinRowBytes = Int32Bytes * 6;
 
-        /// <summary>最大步数：<c>GuideSaveState</c> 的 int 位图上限。</summary>
-        private const int MaxSteps = 32;
+        /// <summary>
+        /// 最大步数：<see cref="GuideSaveState"/> 用 <c>int</c> 位图存进度，最高位是符号位，
+        /// 所以可取 31 位；超过就必须改存档格式，因此在加载期直接拒绝。
+        /// </summary>
+        private const int MaxSteps = 31;
 
         private readonly GuideDef[] _rows;
 
@@ -174,7 +177,8 @@ namespace AIFramework.Features.Guide
 
             if (rowCount > MaxSteps)
             {
-                // 存档位图是 int：超过 32 步就没法无损落盘，必须在加载期挡住而不是运行时静默丢进度。
+                // 存档位图是 int（最高位为符号位，可用 31 位）：超过 31 步就没法无损落盘，
+                // 必须在加载期挡住而不是运行时静默丢进度。
                 throw new InvalidDataException(
                     "引导子表声明 " + rowCount + " 步，超过上限 " + MaxSteps + "（存档位图放不下）。");
             }

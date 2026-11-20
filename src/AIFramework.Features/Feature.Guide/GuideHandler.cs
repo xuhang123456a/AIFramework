@@ -432,15 +432,25 @@ namespace AIFramework.Features.Guide
             return (mask & ~FullMask(count)) == 0;
         }
 
-        /// <summary>低 <paramref name="count"/> 位全 1 的掩码；<paramref name="count"/> 达到 32 时返回 -1（全 1）。</summary>
+        /// <summary>
+        /// 低 <paramref name="count"/> 位全 1 的掩码。
+        /// <para><paramref name="count"/> 由 <see cref="GuideTables"/> 在加载期限到 ≤ 31（见 <c>MaxSteps</c>），
+        /// 因此这里不会踩到 <c>1 &lt;&lt; 32</c> 的移位回绕，位图也永远不会出现负值。</para>
+        /// </summary>
         private static int FullMask(int count)
         {
-            return count >= 32 ? -1 : (1 << count) - 1;
+            return (1 << count) - 1;
         }
 
-        /// <summary>下标严格大于 <paramref name="index"/> 的那些位的掩码。</summary>
+        /// <summary>下标严格大于 <paramref name="index"/> 的那些位的掩码；当前已是最后一步时返回 0。</summary>
         private static int FutureMask(int count, int index)
         {
+            if (index >= count - 1)
+            {
+                // 走到最后一步再算 1 << count 会溢出符号位，直接短路成"没有后续步"。
+                return 0;
+            }
+
             return FullMask(count) & ~((1 << (index + 1)) - 1);
         }
 

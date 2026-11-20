@@ -107,10 +107,10 @@ namespace AIFramework.Features.Tests.Guide
         }
 
         [Fact]
-        public void MoreThanThirtyTwoSteps_ThrowsInvalidDataException()
+        public void MoreThanThirtyOneSteps_ThrowsInvalidDataException()
         {
-            // 存档位图是 int：33 步必须加载期挡住，否则落盘会静默丢进度。
-            var rows = new GuideRowSpec[33];
+            // 存档位图是 int（最高位为符号位，只有 31 位可用）：32 步必须加载期挡住，否则落盘会静默丢进度。
+            var rows = new GuideRowSpec[32];
             for (int i = 0; i < rows.Length; i++)
             {
                 rows[i] = new GuideRowSpec(i + 1, "步", "提示", GuideTriggers.Launch, 0, 1);

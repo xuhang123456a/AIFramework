@@ -508,6 +508,33 @@ namespace AIFramework.Features.Tests.Guide
             Assert.False(snapshot.IsSkippedAll);
         }
 
+        [Fact]
+        public void ThirtyOneSteps_FullMaskRoundTripsAtTheBitmapBoundary()
+        {
+            // 31 步是 int 位图（去掉符号位）的容量上限：跑满后位图必须是 0x7FFFFFFF 且能无损读回。
+            var rows = new GuideRowSpec[31];
+            for (int i = 0; i < rows.Length; i++)
+            {
+                rows[i] = new GuideRowSpec(i + 1, "步 " + (i + 1), "h", GuideTriggers.Launch, 0, 1);
+            }
+
+            GuideHarness harness = GuideHarness.Create(GuideTableStub.WithRows(rows));
+            for (int stepId = 1; stepId <= 31; stepId++)
+            {
+                harness.CompleteStep(stepId, GuideTriggers.Launch, 0);
+            }
+
+            GuideSnapshot snapshot = harness.Query();
+            Assert.True(snapshot.IsCompleted);
+            Assert.Equal(31, snapshot.CompletedCount);
+            Assert.Equal(int.MaxValue, harness.Capture().CompletedMask);
+
+            GuideHarness restored = GuideHarness.Create(GuideTableStub.WithRows(rows));
+            Assert.True(restored.Restore(harness.Capture()));
+            Assert.True(restored.Query().IsCompleted);
+            Assert.Equal(31, restored.Query().CompletedCount);
+        }
+
         // ---------- 存档：导出 / 恢复 ----------
 
         [Fact]

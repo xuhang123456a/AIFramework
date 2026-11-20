@@ -24,7 +24,7 @@
   int32 trigger; int32 targetId; int32 skippable }`。
 * 校验：表缺失（loader 返回 `null`）→ 构造抛 `InvalidOperationException`；
   截断 / 尾部残留 / `stepId` 不从 1 连续 / `trigger` 不在 0..5 / `targetId < 0` /
-  `skippable` 非 0/1 / `title` 为空 / 步数 > 32 → 抛 `InvalidDataException`。
+  `skippable` 非 0/1 / `title` 为空 / 步数 > 31 → 抛 `InvalidDataException`（31 = int 位图去掉符号位）。
 * 解析后行按 `stepId` 升序且强制连续，故恒有 `stepId == 下标 + 1`（位图与 O(1) 定位依赖它）。
 * `trigger` 语义：0=启动、1=进入大厅、2=打开商店、3=完成一场战斗、4=领取签到、5=达到等级。
   `targetId` 是该事实的具体 id（0=不限定）；`skippable=1` 表示该步允许跳过。

@@ -157,7 +157,7 @@ namespace AIFramework.Features.Guide
     /// </para>
     /// <para>
     /// 位图语义：<c>completedMask</c> / <c>skippedMask</c> 的第 <c>i</c> 位（0 起）对应子表第 <c>i</c> 行，
-    /// 即 <c>stepId = i + 1</c>。表步数上限 32（见 <c>GuideTables</c> 的 MaxSteps），所以 int 位图够用。
+    /// 即 <c>stepId = i + 1</c>。表步数上限 31（见 <c>GuideTables</c> 的 MaxSteps：int 位图的最高位是符号位），所以 int 位图够用。
     /// </para>
     /// </summary>
     public readonly struct GuideSaveState
