@@ -128,6 +128,12 @@ namespace AIFramework.Tests.EditMode
             // 成就切片：TbAchievement.bin 必须装配成功（表缺失会被静默降级，这里要把它暴露出来）。
             Assert.IsTrue(host.AchievementAvailable, "成就切片缺表：TbAchievement.bin。");
 
+            // 赛季通行证：TbSeasonPass.bin 必须装配成功（表缺失会被静默降级）。
+            Assert.IsTrue(host.SeasonPassAvailable, "赛季通行证缺表：TbSeasonPass.bin。");
+
+            // 广告端口：未接真实 SDK 时必须如实不可用。
+            Assert.IsFalse(host.Ads.IsAvailable, "广告端口未接 SDK，IsAvailable 必须是 false。");
+
             // IAP 端口：本地假商店无后端时如实不可用，有存储后端才可用。
             Assert.IsTrue(host.Iap.IsAvailable, "IAP 端口应接上本地假商店（有存储后端即可用）。");
             Assert.AreEqual(GameLanguage.ChineseSimplified, host.Localization.CurrentLanguage, "默认语言应是简体中文。");
