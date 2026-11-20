@@ -212,6 +212,10 @@ namespace AIFramework.Features.Guide
 
             _skippedAll = true;
             _reached = false;
+
+            // SkipAll 也要发完成事件：否则表现层（引导高亮条/箭头/红点）收不到通知，
+            // 会停在"上一步"上直到玩家重开场景——这类"状态变了但 UI 不知道"的 bug 最难排查。
+            _bus.Publish(new GuideCompletedEvent());
         }
 
         /// <summary>

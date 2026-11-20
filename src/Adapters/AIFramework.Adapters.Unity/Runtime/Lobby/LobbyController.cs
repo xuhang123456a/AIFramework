@@ -62,6 +62,9 @@ namespace AIFramework.Adapters.Unity.Lobby
         [Tooltip("语言热切换器（可选）：切语言时刷新所有已打开面板，避免旧文案残留。")]
         [SerializeField] private LocalizationHotSwitcher? localizationHotSwitcher = null;
 
+        [Tooltip("新手引导高亮条（可选）：显示当前引导步与条件已达成高亮。")]
+        [SerializeField] private GuideHighlightHud? guideHighlightHud = null;
+
         private AIFrameworkUnityHost? _host;
         private SignInPresenter? _signIn;
         private ShopPresenter? _shop;
@@ -116,6 +119,11 @@ namespace AIFramework.Adapters.Unity.Lobby
             if (battleButton != null)
             {
                 battleButton.onClick.AddListener(OnBattleClicked);
+            }
+
+            if (guideHighlightHud != null)
+            {
+                guideHighlightHud.Bind(host);
             }
 
             // 语言热切换：登记已打开面板，切语言时统一重查文案（不依赖各面板自己订阅）。

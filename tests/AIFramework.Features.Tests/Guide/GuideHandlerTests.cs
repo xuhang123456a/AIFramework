@@ -394,8 +394,10 @@ namespace AIFramework.Features.Tests.Guide
             Assert.Equal(string.Empty, snapshot.Title);
             Assert.False(snapshot.Reached);
 
-            // "不再提示"是用户的拒绝，不是玩法事实：一条事件都不发。
-            Assert.Empty(harness.Events);
+            // "不再提示"仍要通知表现层：否则引导高亮条会停在旧步骤直到重开场景。
+            // 只发一条完成事件（跳过不是"逐步完成"，所以不发 StepChanged）。
+            Assert.Single(harness.Events);
+            Assert.Single(harness.EventsOf<GuideCompletedEvent>());
             Assert.True(harness.Handler.IsSkippedAll);
         }
 
@@ -409,7 +411,7 @@ namespace AIFramework.Features.Tests.Guide
             harness.Advance(1);
             harness.Skip(3);
 
-            Assert.Empty(harness.Events);
+            Assert.Single(harness.Events); // 只有第一次 SkipAll 的那条完成事件
             GuideSnapshot snapshot = harness.Query();
             Assert.True(snapshot.IsSkippedAll);
             Assert.Equal(0, snapshot.CompletedCount);
@@ -424,7 +426,7 @@ namespace AIFramework.Features.Tests.Guide
             harness.SkipAll();
 
             Assert.True(harness.Query().IsSkippedAll);
-            Assert.Empty(harness.Events);
+            Assert.Single(harness.Events); // 幂等：重复跳过不再发事件
         }
 
         [Fact]

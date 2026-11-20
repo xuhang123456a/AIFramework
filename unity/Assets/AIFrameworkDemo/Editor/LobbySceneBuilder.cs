@@ -153,6 +153,17 @@ namespace AIFramework.Demo.Editor
             Button switchLanguageButton = CreateButton("SwitchLanguageButton", root, "切换语言");
             SetHeight(switchLanguageButton.gameObject, RowHeight);
 
+            // 新手引导高亮条：标题 + 提示 + 高亮块（条件达成时点亮），点按钮上报"完成"。
+            Text guideTitle = CreateLabel("GuideTitle", root, "引导：—");
+            SetHeight(guideTitle.gameObject, LabelHeight);
+            Text guideHint = CreateLabel("GuideHint", root, "—");
+            SetHeight(guideHint.gameObject, LabelHeight);
+            Image guideBadge = CreateBadge("GuideReachedBadge", root, new Color(1f, 0.85f, 0.2f, 0.85f));
+            SetHeight(guideBadge.gameObject, LabelHeight);
+            guideBadge.gameObject.SetActive(false);
+            Button guideConfirmButton = CreateButton("GuideConfirmButton", root, "完成当前引导步");
+            SetHeight(guideConfirmButton.gameObject, RowHeight);
+
             // 其余玩法场景统一用 SceneNavigator：不用往 LobbyController 里塞一堆字段，
             // 场景装配校验也会自动检查这些按钮的 targetScene/button 有没有漏注入。
             CreateSceneEntry(root, "ArenaButton", "进入竞技场场景", "ArenaScene");
@@ -201,6 +212,12 @@ namespace AIFramework.Demo.Editor
             SetReference(popupHud, "pushButton", pushButton);
             SetReference(popupHud, "closeButton", closeButton);
             SetReference(controller, "popupHud", popupHud);
+
+            var guideHighlightHud = lobbyGo.AddComponent<GuideHighlightHud>();
+            SetReference(guideHighlightHud, "titleText", guideTitle);
+            SetReference(guideHighlightHud, "hintText", guideHint);
+            SetReference(guideHighlightHud, "highlightBadge", guideBadge);
+            SetReference(controller, "guideHighlightHud", guideHighlightHud);
 
             var localizationHotSwitcher = lobbyGo.AddComponent<LocalizationHotSwitcher>();
             SetReference(controller, "localizationHotSwitcher", localizationHotSwitcher);
@@ -262,6 +279,15 @@ namespace AIFramework.Demo.Editor
             return rect;
         }
 
+        /// <summary>创建一块纯色底（高亮/遮挡块）：无文本，尺寸由调用方用 SetHeight 设定。</summary>
+        private static Image CreateBadge(string name, Transform parent, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            return image;
+        }
         private static Text CreateLabel(string name, Transform parent, string content)
         {
             var go = new GameObject(name);

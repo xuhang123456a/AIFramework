@@ -122,10 +122,28 @@
 | T6-4 | A/B 实验框架 | 分桶（确定性哈希）+ 实验表 + 曝光埋点 | [x] `Feature.Experiment` + `TbExperiment`(6 实验) + FNV 分桶 53 例；tablecheck 新规则 4 例；Console `[Experiment]` 已接 |
 | T6-5 | 限时礼包/折扣 | 时间段 + 折扣 + 限购 | [x] `Feature.LimitedOffer` + `TbLimitedOffer`(6 礼包) 54 例；成交只发 `GrantItemCommand`、扣款交装配层；Console `[LimitedOffer]` 已接 |
 | T6-6 | 回放分享/导出 | 录像导出可分享文本 + 导入 | [x] `ReplaySharing`（AIFR-SHARE 信封 + FNV 校验和，截断/篡改/超长全拒）15 例；Console `[ReplayShare]` 已接 |
-| T6-7 | 引导高亮 UI | 大厅 HUD 订阅 Guide 事件做目标高亮/箭头 | [ ] |
+| T6-7 | 引导高亮 UI | 大厅 HUD 订阅 Guide 事件做目标高亮 | [x] `GuideHighlightHud`（事件驱动渲染、Reached 点亮、完成收起）+ 场景接线；PlayMode 1 例；顺带修 SkipAll 不发完成事件的真缺陷 |
 | T6-8 | 多语言热切换 | 运行时切语言刷新已打开面板 | [x] `ILocalizedPanel` + `LocalizationHotSwitcher`（同物体自动收集、单面板异常隔离）+ Lobby 接线；PlayMode 2 例 |
 | T6-9 | 错误码与提示映射 | 统一错误码 → 本地化 key → Toast，替代散落字符串 | [x] `ErrorCatalog`(15 码) + `ErrorToastRouter` + `ToastRequestedEvent` + 双端 Toast 表现层；22 例 |
 | T6-10 | 运营校验工具 | `tablecheck` 扩展：活动/礼包窗口与折扣检查 | [x] 新增 TbActivitySchedule / TbLimitedOffer / TbExperiment 规则 + 折后价为 0 / 日限>总限 / int32 时间溢出；32 例 |
+---
+
+## T7 · 生产化/服务端化（T6 清空后的下一梯队）
+
+> 全部仍可在纯逻辑 + 假实现下验收；真实 SDK/服务端接入另立任务。
+
+| # | 能力 | 说明 | 状态 |
+|---|---|---|---|
+| T7-1 | 商店掉单对账 | 收据台账 + 掉单检测 + 补发/退款状态机 | [ ] |
+| T7-2 | 云存档 HTTP 端口 | `ICloudSaveTransport` + 冲突合并 + 重试退避 | [ ] |
+| T7-3 | 排行榜服务端化 | 分页/同分排序/赛季重置的服务端契约与假实现 | [ ] |
+| T7-4 | 热更资源校验 | 资源清单 hash + 缺失/损坏回退 | [ ] |
+| T7-5 | 画质与帧率自适应 | 设备档位表 + 动态降级（不碰内核） | [ ] |
+| T7-6 | 跨平台存档迁移 | 游客→正式账号合并、设备迁移夹具 | [ ] |
+| T7-7 | 运营后台模拟器 | 活动/礼包/公告热配置校验 + 冲突检测 | [ ] |
+| T7-8 | 本地化语音/字幕 | 语音 key 与字幕时间轴、缺语言回退 | [ ] |
+| T7-9 | 性能基线回归 | PlayMode 帧耗时/分配阈值 + 回归报告 | [ ] |
+| T7-10 | 错误上报与降级面板 | 崩溃/异常聚合 + 一键上报假实现 | [ ] |
 ---
 
 ## 轮次日志（每轮追加，最新在上）
