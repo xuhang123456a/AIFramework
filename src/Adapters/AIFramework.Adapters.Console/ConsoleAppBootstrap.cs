@@ -98,6 +98,8 @@ namespace AIFramework.Adapters.Console
             WirePush();
             WireErrorReport();
             WireReconcile();
+            WireResourceManifest();
+            WireLeaderboardPager();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -321,6 +323,57 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>
+        /// 热更资源清单校验：对 DemoTable 目录建清单再逐条校验，演示"全有或全无"的回退结论。
+        /// <para>用真实 .bin 文件做校验对象——空跑假数据的测试没有说服力。</para>
+        /// </summary>
+        private void WireResourceManifest()
+        {
+            string tablesDirectory = ResolveDemoTablesDirectory();
+            string[] files = System.IO.Directory.GetFiles(tablesDirectory, "*.bin");
+            var entries = new AssetManifestEntry[files.Length];
+            for (int i = 0; i < files.Length; i++)
+            {
+                byte[] data = System.IO.File.ReadAllBytes(files[i]);
+                entries[i] = new AssetManifestEntry(
+                    System.IO.Path.GetFileName(files[i]),
+                    ResourceManifestVerifier.Sha256Hex(data),
+                    data.Length);
+            }
+
+            var manifest = new AssetManifest("demo-tables", entries);
+            var verifier = new ResourceManifestVerifier();
+            AssetCheckOutcome[] outcomes = verifier.Verify(in manifest, name =>
+            {
+                string path = System.IO.Path.Combine(tablesDirectory, name);
+                return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
+            });
+
+            int failures = ResourceManifestVerifier.CountFailures(outcomes);
+            _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
+                + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>排行榜分页接线：假服务端排序 → pager 归一化 → 取自己所在页。</summary>
+        private void WireLeaderboardPager()
+        {
+            var server = new ConsoleLeaderboardServer();
+            server.TrySubmit(1, 10001, 1200);
+            server.TrySubmit(1, 10002, 1500);
+            server.TrySubmit(1, 10003, 1200);
+            server.TrySubmit(1, 10004, 900);
+
+            var pager = new LeaderboardPager(server);
+            var request = new LeaderboardPageRequest(1, LeaderboardSeason.Current, offset: 0, limit: 2, playerId: 10003);
+            LeaderboardPage page = pager.Fetch(in request);
+            LeaderboardPage self = pager.FetchAroundSelf(1, 10003, radius: 1);
+
+            _writer.WriteLine("[Leaderboard] 总数=" + page.TotalCount + " 本页=" + page.Rows.Length
+                + " 首位=" + (page.Rows.Length > 0 ? page.Rows[0].PlayerId + "/" + page.Rows[0].Score : "空")
+                + " 我的名次=" + (page.SelfRow.HasValue ? page.SelfRow.Value.Rank : 0)
+                + " 自己页=" + self.Rows.Length);
+        }
+
         /// <summary>掉单对账接线：拿一批"商店已成交"的收据对账，Missing 的补发一次。</summary>
         private void WireReconcile()
         {

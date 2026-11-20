@@ -65,6 +65,9 @@ namespace AIFramework.Demo.Editor
             CreateCamera();
 
             var bootGo = new GameObject(BootObjectName);
+            // 画质自适应：按帧耗时滑动窗口自动升降档（不阻塞、不影响玩法内核）。
+            bootGo.AddComponent<AIFramework.Adapters.Unity.QualityTierAutoAdapter>();
+
             var controller = bootGo.AddComponent<BootController>();
             SetStringField(controller, NextSceneFieldName, NextSceneName);
 

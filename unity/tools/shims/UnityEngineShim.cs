@@ -325,6 +325,17 @@ namespace UnityEngine
 
         /// <summary>引擎版本号（形状桩：真实 Unity 在 Application 上，HybridCLR 安装器要读它）。</summary>
         public static string unityVersion = "6000.0.0f1";
+
+        /// <summary>
+        /// 目标帧率（<b>追加桩</b>，T7-5 画质档位用）：真实 Unity 里是 <c>int</c> 的 get/set 属性，
+        /// <c>-1</c>/<c>0</c> 都表示"交给平台/垂直同步决定"。
+        /// <para>
+        /// 这里追加成普通字段而不是属性：离线形状校验只关心"成员是否存在、可读可写"。
+        /// 之所以必须改动本文件而不是另开一个文件，是因为 <c>Application</c> 是 <c>static class</c> 且未声明
+        /// <c>partial</c>，跨文件无法补成员——这是本任务对既有桩唯一的一处内联追加。
+        /// </para>
+        /// </summary>
+        public static int targetFrameRate;
     }
 
     public enum QueryTriggerInteraction

@@ -136,9 +136,9 @@
 |---|---|---|---|
 | T7-1 | 商店掉单对账 | 收据台账 + 掉单检测 + 补发/退款状态机 | [x] `PurchaseReconciler`（Missing/Granted/Duplicated/Refunded/Orphan）+ 防双发 45 例；Console `[Reconcile]` 已接 |
 | T7-2 | 云存档 HTTP 端口 | `ICloudTransport` + 冲突合并 + 重试退避 | [x] `ICloudTransport` + `CloudSaveSyncClient`（按动作重试、退避可观测不 sleep、Conflict 重下重合并）52 例 |
-| T7-3 | 排行榜服务端化 | 分页/同分排序/赛季重置的服务端契约与假实现 | [ ] |
-| T7-4 | 热更资源校验 | 资源清单 hash + 缺失/损坏回退 | [ ] |
-| T7-5 | 画质与帧率自适应 | 设备档位表 + 动态降级（不碰内核） | [ ] |
+| T7-3 | 排行榜服务端化 | 分页/同分排序/赛季重置 | [x] `ILeaderboardServer` + `LeaderboardPager`（同分按 playerId 升序、FetchAroundSelf≤2 次请求、Limit 回显应用上限）73 例；Console `[Leaderboard]` 已接 |
+| T7-4 | 热更资源校验 | 资源清单 hash + 缺失/损坏回退 | [x] `ResourceManifestVerifier`（缺失/截断/哈希不符三类区分 + 全有或全无回退）+ 18 例；Console `[Resource]` 用真实 18 张表实测 0 失败 |
+| T7-5 | 画质与帧率自适应 | 帧耗时驱动档位 + 动态降级 | [x] `QualityTierSelector`(36 例，环形窗口/迟滞/冷却零分配) + `UnityQualitySettingsPort` + `QualityTierAutoAdapter`；BootScene 接线 |
 | T7-6 | 跨平台存档迁移 | 游客→正式账号合并、设备迁移夹具 | [ ] |
 | T7-7 | 运营后台模拟器 | 活动/礼包/公告热配置校验 + 冲突检测 | [ ] |
 | T7-8 | 本地化语音/字幕 | 语音 key 与字幕时间轴、缺语言回退 | [ ] |
