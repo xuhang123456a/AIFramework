@@ -18,6 +18,14 @@ namespace AIFramework.Core.Replay
     /// 数字一律按不变文化格式化，保证同一局在同一端口上永远落到同一个键。
     /// </para>
     /// <para>
+    /// <b>为什么分隔符是 <c>.</c> 而不是目录式的 <c>/</c></b>：<see cref="IStoragePort"/> 的键在
+    /// 两个真实实现里都是"根目录下的单个文件名"（Console 的 <c>FileSystemStoragePort</c> 存成
+    /// <c>key + ".sav"</c>，Unity 的 <c>UnityStoragePort</c> 存成 <c>root/key</c>），且两者都有
+    /// <c>[A-Za-z0-9._-]</c> 的白名单校验——<c>/</c> 会直接被判"非法字符"抛异常，
+    /// 就算放行也会落到不存在的子目录、并在 <c>ListKeys</c> 里被 <c>GetFileName</c> 截掉前缀。
+    /// <c>.</c> 既安全、又与 <c>SaveService</c> 的 <c>save.N</c> 同口径。
+    /// </para>
+    /// <para>
     /// <b>列表不加载帧数据</b>：列表只走 <see cref="ReplayArchiveCodec.TryReadInfo"/>，不分配帧数组。
     /// 但要说清当前的端口限制——<see cref="IStoragePort"/> 只有整块 <c>Read(key)</c>，没有"读前 N 字节"，
     /// 所以列表实际上是"把整档读进内存、只解析头部"。真实实现（文件系统/云端）应改成分段读头部
@@ -43,7 +51,7 @@ namespace AIFramework.Core.Replay
         /// <summary>默认键前缀。</summary>
         public const string DefaultPrefix = "replays";
 
-        /// <summary>键层级分隔符。</summary>
+        /// <summary>键层级分隔符。<b>必须是端口白名单内的字符</b>（<c>/</c> 会被真实端口拒绝，见类注释）。</summary>
         private const string KeySeparator = ".";
 
         /// <summary>落盘端口（Console 是目录、Unity 是 persistentDataPath、云端由适配层换远端实现）。</summary>
@@ -295,7 +303,7 @@ namespace AIFramework.Core.Replay
         }
 
         /// <summary>
-        /// 构造键：<c>prefix/levelId-randomSeed-recordedAt</c>。数字按不变文化格式化，
+        /// 构造键：<c>prefix.levelId-randomSeed-recordedAt</c>。数字按不变文化格式化，
         /// 避免某些区域的小数/分组分隔符混进键里（键要能原样当文件名用）。
         /// </summary>
         private string BuildSlotKey(int levelId, int randomSeed, long recordedAtUnixSeconds)
@@ -306,7 +314,7 @@ namespace AIFramework.Core.Replay
                 + recordedAtUnixSeconds.ToString(CultureInfo.InvariantCulture);
         }
 
-        /// <summary>前缀规范化：空串/全分隔符退回默认值，去掉尾部分隔符避免 <c>replays//…</c>。</summary>
+        /// <summary>前缀规范化：空串/全分隔符退回默认值，去掉尾部分隔符避免 <c>replays..…</c>（顺带兼容误传的 <c>/</c>）。</summary>
         private static string NormalizePrefix(string prefix)
         {
             if (string.IsNullOrEmpty(prefix))

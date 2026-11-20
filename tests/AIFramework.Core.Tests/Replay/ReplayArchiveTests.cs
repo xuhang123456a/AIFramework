@@ -531,12 +531,15 @@ namespace AIFramework.Core.Tests.Replay
         }
 
         [Fact]
-        public void Save_EmptyPrefixOrTrailingSlash_KeepsSingleSeparator()
+        public void Save_EmptyOrSeparatorSuffixedPrefix_KeepsSingleSeparator()
         {
+            // 前缀末尾的分隔符（含误传的目录式 "/"）必须被吃掉，否则会出现 replays..7-… 这种双分隔键。
             var trimmed = new ReplayArchiveStore(new ArchiveTestStorage(), "replays.");
+            var slash = new ReplayArchiveStore(new ArchiveTestStorage(), "replays/");
             var fallback = new ReplayArchiveStore(new ArchiveTestStorage(), string.Empty);
 
             Assert.Equal("replays.7-42-1700000000", trimmed.Save(1, 7, 42, ThreeWaves(42), SampleFingerprints, RecordedAt));
+            Assert.Equal("replays.7-42-1700000000", slash.Save(1, 7, 42, ThreeWaves(42), SampleFingerprints, RecordedAt));
             Assert.Equal("replays.7-42-1700000000", fallback.Save(1, 7, 42, ThreeWaves(42), SampleFingerprints, RecordedAt));
         }
 
