@@ -9,9 +9,11 @@ using AIFramework.Adapters.Console.E2e;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Contracts.Services;
+using AIFramework.Contracts.Testing;
 using AIFramework.Core.Meta;
 using AIFramework.Core.Replay;
 using AIFramework.Core.Save;
+using AIFramework.Core.Testing;
 using AIFramework.Core.Services;
 using AIFramework.Features.Achievement;
 using AIFramework.Features.ActivitySchedule;
@@ -19,6 +21,8 @@ using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
 using AIFramework.Features.Experiment;
 using AIFramework.Features.Guide;
+using AIFramework.Features.ReplayBrowser;
+using AIFramework.Features.RichText;
 using AIFramework.Features.LimitedOffer;
 using AIFramework.Features.Localization;
 using AIFramework.Features.VoiceOver;
@@ -114,6 +118,9 @@ namespace AIFramework.Adapters.Console
             WireGuideDemo();
             WireSaveCompression();
             WireAssetBundles();
+            WireReplayBrowser();
+            WireMockGateway();
+            WireRichText();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -368,6 +375,60 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>Mock 网关演示：注册成功/超时/服务端错误三种规则，打印响应与调用记录。</summary>
+        private void WireMockGateway()
+        {
+            var gateway = new MockGateway(_time);
+            gateway.AddRule(new MockRule("save.write", "slot=1", MockTransportOutcome.Ok, "{\"ok\":true}", 20));
+            gateway.AddRule(new MockRule("leaderboard.submit", null, MockTransportOutcome.ServerError, string.Empty, 0));
+            gateway.AddRule(new MockRule("cloud.load", null, MockTransportOutcome.Timeout, string.Empty, 3000));
+
+            MockResponse ok = gateway.Invoke("save.write", "slot=1&data=AISV");
+            MockResponse error = gateway.Invoke("leaderboard.submit", "score=42");
+            MockResponse timeout = gateway.Invoke("cloud.load", "user=10001");
+
+            _writer.WriteLine("[MockGate] 成功=" + ok.Outcome + " 载荷=" + ok.Payload
+                + " 错误=" + error.Outcome + " 超时=" + timeout.Outcome + " 调用=" + gateway.Calls.Length);
+        }
+
+        /// <summary>富文本安全渲染演示：合法标签保留、非法标签剥离并给诊断。</summary>
+        private void WireRichText()
+        {
+            RichTextDocument document = RichTextParser.Parse(
+                "活动开启！<b>限时</b> <color=#FF8800>双倍</color> 掉落<size=24>（仅今日）</size><script>alert(1)</script>");
+
+            _writer.WriteLine("[RichText] 片段=" + document.Spans.Length + " 诊断=" + document.Diagnostics.Length
+                + " 纯文本=" + document.PlainText);
+        }
+
+        /// <summary>回放列表演示：从真实录像仓库读列表 → 分页/排序 → 删除一条并核对事件。</summary>
+        private void WireReplayBrowser()
+        {
+            var store = new ReplayArchiveStore(_storage, "replay-browser");
+            for (int i = 0; i < 12; i++)
+            {
+                int seed = 100 + i;
+                var script = new ReplayScriptData(seed, 0, System.Array.Empty<WaveSpecData>());
+                var fingerprints = new long[3 + (i % 4)];
+                for (int f = 0; f < fingerprints.Length; f++)
+                {
+                    fingerprints[f] = (i * 10) + f;
+                }
+
+                store.Save(0, 1 + (i % 3), seed, script, fingerprints, 1_800_000_000 + i);
+            }
+
+            var browser = new ReplayBrowserHandler(_bus, new ConsoleReplayArchivePort(store));
+            ReplayListPage first = browser.Query(new ReplayListQuery(0, 5));
+            ReplayListPage byLength = browser.Query(new ReplayListQuery(0, 3, ReplaySortOrder.LongestFirst));
+            bool deleted = browser.Delete(first.Entries[0].SlotKey);
+            ReplayListPage afterDelete = browser.Query(new ReplayListQuery(0, 5));
+
+            _writer.WriteLine("[ReplayList] " + first.ToReportLine());
+            _writer.WriteLine("[ReplayList] 按长度=" + byLength.Entries[0].SlotKey + " 最长帧=" + byLength.Entries[0].FrameCount);
+            _writer.WriteLine("[ReplayList] 删除=" + deleted + " 剩余=" + afterDelete.TotalCount);
         }
 
         /// <summary>分包清单校验演示：核心包/关卡包/赛季包 + 依赖关系，打印体积与问题汇总。</summary>
