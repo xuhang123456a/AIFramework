@@ -1,0 +1,22 @@
+{
+  "table": "TbActivitySchedule",
+  "columns": [
+    { "name": "activityId", "type": "int32" },
+    { "name": "name", "type": "string" },
+    { "name": "startUnixSeconds", "type": "int32" },
+    { "name": "endUnixSeconds", "type": "int32" },
+    { "name": "dailyResetHourUtc", "type": "int32" },
+    { "name": "rotationGroup", "type": "int32" },
+    { "name": "priority", "type": "int32" }
+  ],
+  "rows": [
+    { "activityId": 1001, "name": "周年庆典", "startUnixSeconds": 1767225600, "endUnixSeconds": 1775001600, "dailyResetHourUtc": 4, "rotationGroup": 1, "priority": 10 },
+    { "activityId": 1002, "name": "春日巡礼", "startUnixSeconds": 1775001600, "endUnixSeconds": 1782864000, "dailyResetHourUtc": 4, "rotationGroup": 1, "priority": 20 },
+    { "activityId": 1003, "name": "夏日狂欢", "startUnixSeconds": 1782864000, "endUnixSeconds": 1790812800, "dailyResetHourUtc": 4, "rotationGroup": 1, "priority": 20 },
+    { "activityId": 1004, "name": "秋季回归", "startUnixSeconds": 1790812800, "endUnixSeconds": 1798761600, "dailyResetHourUtc": 0, "rotationGroup": 1, "priority": 30 },
+    { "activityId": 2001, "name": "轮换·青铜", "startUnixSeconds": 1793491200, "endUnixSeconds": 1796083200, "dailyResetHourUtc": 0, "rotationGroup": 2, "priority": 10 },
+    { "activityId": 2002, "name": "轮换·白银", "startUnixSeconds": 1794700800, "endUnixSeconds": 1797292800, "dailyResetHourUtc": 0, "rotationGroup": 2, "priority": 20 },
+    { "activityId": 2003, "name": "轮换·黄金", "startUnixSeconds": 1797292800, "endUnixSeconds": 1799971200, "dailyResetHourUtc": 0, "rotationGroup": 2, "priority": 30 },
+    { "activityId": 2004, "name": "轮换·限时冲刺", "startUnixSeconds": 1795564800, "endUnixSeconds": 1795651200, "dailyResetHourUtc": 12, "rotationGroup": 2, "priority": 20 }
+  ]
+}

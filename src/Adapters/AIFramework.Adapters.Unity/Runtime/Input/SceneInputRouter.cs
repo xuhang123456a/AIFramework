@@ -58,6 +58,9 @@ namespace AIFramework.Adapters.Unity.Inputs
         /// <summary>是否组装触屏源（默认开；Editor 里 touchCount 恒 0，等于空转）。</summary>
         [SerializeField] private bool enableTouch = true;
 
+        /// <summary>是否组装手柄源（默认开；没接手柄时所有读取恒为 0，等于空转）。</summary>
+        [SerializeField] private bool enableGamepad = true;
+
         /// <summary>当前输入源（<see cref="Awake"/> 组装，测试可替换）。</summary>
         private IInputSource? _source;
 
@@ -163,19 +166,30 @@ namespace AIFramework.Adapters.Unity.Inputs
         /// <returns>组装好的输入源，或 null。</returns>
         private IInputSource? ComposeSources()
         {
-            if (enableKeyboard && enableTouch)
-            {
-                return new CompositeInputSource(new KeyboardInputSource(), new TouchInputSource());
-            }
-
+            var sources = new System.Collections.Generic.List<IInputSource>(3);
             if (enableKeyboard)
             {
-                return new KeyboardInputSource();
+                sources.Add(new KeyboardInputSource());
             }
 
             if (enableTouch)
             {
-                return new TouchInputSource();
+                sources.Add(new TouchInputSource());
+            }
+
+            if (enableGamepad)
+            {
+                sources.Add(new GamepadInputSource());
+            }
+
+            if (sources.Count == 1)
+            {
+                return sources[0];
+            }
+
+            if (sources.Count > 1)
+            {
+                return new CompositeInputSource(sources.ToArray());
             }
 
             return null;

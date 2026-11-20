@@ -11,6 +11,15 @@ namespace UnityEngine
     /// </summary>
     public enum KeyCode
     {
+        /// <summary>手柄第 1 个键（多数手柄 A/✕，真实值 350）。</summary>
+        JoystickButton0 = 350,
+
+        /// <summary>手柄第 2 个键（B/○，真实值 351）。</summary>
+        JoystickButton1 = 351,
+
+        /// <summary>手柄第 8 个键（Start，真实值 357）。</summary>
+        JoystickButton7 = 357,
+
         /// <summary>回车（主键盘 Enter）。</summary>
         Return = 13,
 

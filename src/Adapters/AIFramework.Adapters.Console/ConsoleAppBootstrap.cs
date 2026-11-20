@@ -7,8 +7,10 @@ using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
 using AIFramework.Core.Gameplay;
 using AIFramework.Core.Meta;
+using AIFramework.Core.Replay;
 using AIFramework.Core.Services;
 using AIFramework.Features.Achievement;
+using AIFramework.Features.ActivitySchedule;
 using AIFramework.Features.DailySignIn;
 using AIFramework.Features.Gacha;
 using AIFramework.Features.Guide;
@@ -83,6 +85,8 @@ namespace AIFramework.Adapters.Console
             WireAchievement();
             WireSeasonPass();
             WireGuide();
+            WireActivitySchedule();
+            RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
 
@@ -305,6 +309,38 @@ namespace AIFramework.Adapters.Console
         /// 存档端口冒烟：把签到状态的 3 个 int（12 字节）写进临时目录，重开一个端口实例读回校验，
         /// 最后无条件递归删除临时目录。非帧内代码，允许分配。
         /// </summary>
+        /// <summary>活动轮换接线：排期由表驱动，tick 由时间源推动（这里只跑一次演示）。</summary>
+        private void WireActivitySchedule()
+        {
+            var schedule = new ActivityScheduleHandler(_bus, _time, _tables);
+            schedule.Register(_bus);
+            _bus.Send(new ActivityTickCommand());
+
+            ActivityScheduleSnapshot snapshot = _bus.Query<ActivityQueryRequest, ActivityScheduleSnapshot>(new ActivityQueryRequest());
+            _writer.WriteLine("[Activity] 开启=" + snapshot.OpenCount + "/" + snapshot.Activities.Count
+                + " 首个=" + (snapshot.Activities.Count > 0 ? snapshot.Activities[0].Name : "无")
+                + " 剩余=" + (snapshot.Activities.Count > 0 ? snapshot.Activities[0].SecondsRemaining : 0) + "s");
+        }
+
+        /// <summary>回放落盘冒烟：编码 → 存储 → 列表 → 读回帧指纹 → 删除。</summary>
+        private void RunReplayArchiveSmoke()
+        {
+            var store = new ReplayArchiveStore(_storage, "demo-replays");
+            var wave1 = new WaveSpecData(2, 0.35f);
+            var wave2 = new WaveSpecData(3, 0.35f);
+            var script = new ReplayScriptData(randomSeed: 20261120, waveCount: 2, new[] { wave1, wave2 });
+            long now = 1764000000L;
+            string key = store.Save(kernelType: 1, levelId: 1, randomSeed: 20261120, script, new long[] { 11L, 22L, 33L }, now);
+            ReplayArchiveInfo[] list = store.List();
+            bool loaded = store.TryLoadFingerprints(key, out long[] fingerprints, out string reason);
+            int overlong = store.Save(kernelType: 1, levelId: 2, randomSeed: 20261120, script, new long[] { 1L }, now + 1).Length > 0 ? 1 : 0;
+            bool deleted = store.Delete(key);
+
+            _writer.WriteLine("[Replay] 保存后列表=" + list.Length + " 读回=" + loaded
+                + " 帧数=" + (loaded ? fingerprints.Length : 0)
+                + " 再存=" + overlong + " 删除=" + deleted);
+        }
+
         /// <summary>新手引导接线：表驱动步骤机；外部事实（进大厅/开商店/完成战斗）由适配层翻译成 trigger。</summary>
         private void WireGuide()
         {
