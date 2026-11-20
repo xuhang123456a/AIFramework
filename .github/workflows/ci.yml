@@ -33,6 +33,9 @@ jobs:
       - name: 配置表 JSON 与已导出 .bin 一致（改 JSON 忘导出即失败）
         run: dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --check
 
+      - name: 本地化 CSV/JSON 一致性
+        run: dotnet run --project tools/locconvert/LocConvert.csproj --no-build -- --tables tables --check
+
       - name: 运营排期体检（活动/礼包跨表冲突）
         run: dotnet run --project tools/opcheck/OpCheck.csproj --no-build -- --tables tables
 

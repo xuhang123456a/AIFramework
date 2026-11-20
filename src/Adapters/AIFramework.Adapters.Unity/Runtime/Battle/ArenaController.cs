@@ -2,9 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using AIFramework.Contracts.Ai;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
+using AIFramework.Core.Ai;
 using AIFramework.Core.Replay;
 using AIFramework.Core.Services;
 using UnityEngine;
@@ -91,6 +93,31 @@ namespace AIFramework.Adapters.Unity.Battle
         /// </summary>
         private const float EnemyRingDistance = 4f;
 
+        /// <summary>
+        /// 敌人 AI 追击速度（世界单位/秒）。<b>刻意远低于飞行物速度（8）</b>：
+        /// 位移只改变"敌人站在射线上的哪一段"，不改变"反射弹沿原射线飞回"这一命中几何。
+        /// </summary>
+        private const float EnemyChaseSpeed = 0.6f;
+
+        /// <summary>
+        /// 追击停止半径。<b>必须大于护盾反射查询半径（主角半径 1 + padding 0.5 = 1.5）</b>：
+        /// 敌人停在这个半径外，反射弹从护盾圈向外飞时必然还会经过它；一旦让它挤进护盾圈内侧，
+        /// 自己的反射弹就可能"从它背后飞走"，本波永远清不掉，胜负会被 AI 位移改写。
+        /// </summary>
+        private const float EnemyChaseStopRadius = 2f;
+
+        /// <summary>
+        /// 撤退最远半径。<b>必须远小于飞行物出界回收半径（40）</b>：反射弹速度 8 远高于撤退速度 0.6，
+        /// 敌人退到 5.5 之前就会被追上；再远则可能先出界，波次同样清不掉。
+        /// </summary>
+        private const float EnemyRetreatMaxRadius = 5.5f;
+
+        /// <summary>敌人 AI 的撤退血量百分比（黑板 0..100 口径）。</summary>
+        private const int EnemyRetreatHpPercent = 30;
+
+        /// <summary>敌人 AI 诊断日志间隔（逻辑帧）：60 fps 下约每半秒一条，不参与任何战斗判定。</summary>
+        private const int EnemyAiLogIntervalFrames = 30;
+
         /// <summary>敌方飞行物伤害：够一击打死敌人（14 ≥ 10），也够在没有反射时逐步磨死主角。</summary>
         private const int EnemyProjectileDamage = 14;
 
@@ -136,6 +163,18 @@ namespace AIFramework.Adapters.Unity.Battle
 
         /// <summary>会话强转出来的飞行物只读视图；内核未实现该接口时为 <c>null</c>。</summary>
         private IProjectileWorldReadView? _projectiles;
+
+        /// <summary>会话强转出来的意图写通道；内核未实现时为 <c>null</c>（此时只做决策，不落位移）。</summary>
+        private IIntentWriter? _intents;
+
+        /// <summary>
+        /// 敌人 AI 决策器（纯 C#，包一棵无状态行为树）。<b>全体敌人共用一个实例</b>：
+        /// 树本身不存跨帧状态，每帧每个敌人各喂一次黑板；诊断字段保留"最后一个被求值的敌人"。
+        /// </summary>
+        private ArenaEnemyAi? _enemyAi;
+
+        /// <summary>敌人 AI 诊断日志的帧计数（每 <see cref="EnemyAiLogIntervalFrames"/> 帧输出一条）。</summary>
+        private int _enemyAiLogCounter;
 
         /// <summary>
         /// 本波的场景表现绑定器：把布场出来的单位/飞行物变成已登记碰撞体的场景对象。
@@ -217,6 +256,29 @@ namespace AIFramework.Adapters.Unity.Battle
             get { return _isVictory; }
         }
 
+        /// <summary>
+        /// 最近一次敌人 AI 求值输出的动作（诊断；无敌人或尚未开局为 <see cref="BehaviorAction.None"/>）。
+        /// <b>它是"最后一个被求值的敌人"的动作</b>，不是全队聚合结果；只用于观感排查，不参与胜负判定。
+        /// </summary>
+        public BehaviorAction LastEnemyAction
+        {
+            get
+            {
+                ArenaEnemyAi? ai = _enemyAi;
+                return ai != null ? ai.LastAction : BehaviorAction.None;
+            }
+        }
+
+        /// <summary>最近一次敌人 AI 求值访问的节点数（诊断，口径见 <c>BehaviorTree.EvaluationsUsed</c>）。</summary>
+        public int LastEnemyEvaluationCount
+        {
+            get
+            {
+                ArenaEnemyAi? ai = _enemyAi;
+                return ai != null ? ai.LastEvaluationCount : 0;
+            }
+        }
+
         /// <summary>最近一次"回放上一局"是否逐帧一致（未回放过或回放中断时为 <c>false</c>）。</summary>
         public bool LastReplayMatched
         {
@@ -291,6 +353,11 @@ namespace AIFramework.Adapters.Unity.Battle
             _audioBridge = new BattleAudioBridge(_audio, _audioSelector);
             _audioSampler = new BattleAudioFrameSampler();
 
+            // T8-1 敌人 AI：树在开局前编译一次（配置校验也发生在这一刻），之后每波复用。
+            // 决策是纯函数（只读视图 + 黑板），所以回放局能逐帧复现同一串动作。
+            _enemyAi = new ArenaEnemyAi(BehaviorTreeLibrary.CreateArenaEnemyTree());
+            _enemyAiLogCounter = 0;
+
             ArenaHud? view = hud;
             if (view != null)
             {
@@ -333,6 +400,11 @@ namespace AIFramework.Adapters.Unity.Battle
             {
                 binder.Sync();
             }
+
+            // T8-1 钩子：Step 之后、换波裁决之前读一次现场。AI 只做两件事——
+            // 把 MoveToward/MoveAway 翻成一次有界的径向 MoveIntent（下一帧才落位），
+            // 其余动作只记诊断。伤害/命中/胜负仍全部由内核管线结算。
+            TickEnemyAi(_wave, log: true);
 
             Tick();
 
@@ -462,6 +534,212 @@ namespace AIFramework.Adapters.Unity.Battle
         }
 
         /// <summary>
+        /// T8-1 敌人 AI 每帧决策：对每个存活敌人构造一次黑板 → <see cref="ArenaEnemyAi.Tick"/> →
+        /// 把 MoveToward/MoveAway 翻成一次<b>有界径向</b> <see cref="MoveIntent"/>（下一帧 Phase 5 才落位）。
+        /// <para>
+        /// <b>为什么不直接改坐标</b>：本类从不写内核状态，位移也走 <see cref="IIntentWriter"/>，
+        /// 由管线统一仲裁。这样 AI 只是"多提交一条意图"，伤害/命中/胜负仍由内核结算。
+        /// </para>
+        /// <para>
+        /// <b>为什么位移必须保持径向且有内外半径</b>：本关的敌人是"朝原点发射一枚弹，护盾把弹沿原射线反射回来"。
+        /// 敌人沿射线接近/远离时，反射弹的返回路径仍然穿过它，命中与否不变；一旦允许切向移动，
+        /// 反射弹就可能擦过，波次清不掉、胜负会被 AI 改写。追到 <see cref="EnemyChaseStopRadius"/> 就停、
+        /// 退到 <see cref="EnemyRetreatMaxRadius"/> 就停，两个边界都用注释写清了与护盾/回收半径的关系。
+        /// </para>
+        /// <para>
+        /// <b>Attack / Wait 为什么只记诊断</b>：内核没有"敌人攻击冷却/重新出膛"的端口——敌人的弹在布场时
+        /// 一次性生成，之后没有按单位补弹的 API。强行用 DamageIntent 补伤害就会改战斗规则，所以这两类动作
+        /// 只落在 <see cref="LastEnemyAction"/> 与诊断日志里，等内核将来暴露攻击端口再接。
+        /// </para>
+        /// </summary>
+        /// <param name="wave">当前波次（回放局用回放循环的局部波次，保证与录制局同一黑板）。</param>
+        /// <param name="log">是否输出节流诊断日志（回放局关闭，避免刷屏且不影响状态）。</param>
+        private void TickEnemyAi(int wave, bool log)
+        {
+            ArenaEnemyAi? ai = _enemyAi;
+            IUnitWorldReadView? units = _units;
+            if (ai == null || units == null || !_protagonist.IsValid)
+            {
+                return;
+            }
+
+            if (!units.TryGetUnit(_protagonist, out UnitReadView protagonist))
+            {
+                return;
+            }
+
+            int count = units.Count;
+            int aliveEnemies = 0;
+            for (int i = 0; i < count; i++)
+            {
+                UnitReadView view = units[i];
+                if (view.Tags.Has(GameplayTags.UnitShieldActive))
+                {
+                    continue;
+                }
+
+                if (view.Hp > 0)
+                {
+                    aliveEnemies++;
+                }
+            }
+
+            if (aliveEnemies <= 0)
+            {
+                return;
+            }
+
+            IProjectileWorldReadView? projectiles = _projectiles;
+            IIntentWriter? intents = _intents;
+            float stepSeconds = EffectiveStepSeconds();
+            BehaviorAction lastAction = BehaviorAction.None;
+            int lastEvaluationCount = 0;
+            int movedCount = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                UnitReadView enemy = units[i];
+                if (enemy.Tags.Has(GameplayTags.UnitShieldActive) || enemy.Hp <= 0)
+                {
+                    continue;
+                }
+
+                // 黑板口径（全部取"这一帧能读到的近似值"，不引入额外状态）：
+                // HP 百分比按满血常量归一；距离是到主角的世界距离四舍五入；
+                // 冷却就绪 = 这个敌人名下已经没有在飞的弹（弹被反射后 Owner 会改成主角）。
+                int hpPercent = enemy.Hp >= EnemyHp ? 100 : enemy.Hp * 100 / EnemyHp;
+                float distance = Vec2.Distance(enemy.Position, protagonist.Position);
+                int enemyDistance = (int)(distance + 0.5f);
+                bool cooldownReady = !HasProjectileOwnedBy(projectiles, enemy.Handle);
+
+                var blackboard = new Blackboard(
+                    hpPercent,
+                    enemyDistance,
+                    aliveEnemies,
+                    cooldownReady,
+                    wave,
+                    EnemyRetreatHpPercent);
+
+                BehaviorAction action = ai.Tick(in blackboard);
+                lastAction = action;
+                lastEvaluationCount = ai.LastEvaluationCount;
+
+                if (intents != null)
+                {
+                    movedCount += ApplyEnemyMotion(
+                        intents, in enemy, in protagonist, action, stepSeconds);
+                }
+            }
+
+            _enemyAiLogCounter++;
+            if (!log || _enemyAiLogCounter < EnemyAiLogIntervalFrames)
+            {
+                return;
+            }
+
+            _enemyAiLogCounter = 0;
+            AIFrameworkUnityHost? host = _host;
+            if (host != null)
+            {
+                // 只在节流点拼字符串：逐帧日志会制造每帧分配，也会把真机日志刷爆。
+                host.Log.Info("[Arena][AI] 波=" + wave + "，存活敌=" + aliveEnemies
+                    + "，动作=" + lastAction + "，求值节点=" + lastEvaluationCount
+                    + "，本帧位移敌=" + movedCount);
+            }
+        }
+
+        /// <summary>
+        /// 把 AI 动作翻成一次径向位移意图。只有 MoveToward/MoveAway 会写世界；
+        /// 位移量按固定帧长限速，且被夹在 [<see cref="EnemyChaseStopRadius"/>,
+        /// <see cref="EnemyRetreatMaxRadius"/>] 内，避免破坏反射弹的命中几何。
+        /// </summary>
+        /// <returns>是否提交了位移意图（0/1，供诊断计数）。</returns>
+        private static int ApplyEnemyMotion(
+            IIntentWriter writer,
+            in UnitReadView enemy,
+            in UnitReadView protagonist,
+            BehaviorAction action,
+            float stepSeconds)
+        {
+            if (action != BehaviorAction.MoveToward && action != BehaviorAction.MoveAway)
+            {
+                return 0;
+            }
+
+            Vec2 toTarget = protagonist.Position - enemy.Position;
+            float distance = toTarget.Length;
+            if (distance <= 0.0001f)
+            {
+                return 0;
+            }
+
+            Vec2 direction = toTarget / distance;
+            float travel;
+            float maxTravel = EnemyChaseSpeed * stepSeconds;
+
+            if (action == BehaviorAction.MoveToward)
+            {
+                if (distance <= EnemyChaseStopRadius)
+                {
+                    return 0;
+                }
+
+                travel = distance - EnemyChaseStopRadius;
+                if (travel > maxTravel)
+                {
+                    travel = maxTravel;
+                }
+            }
+            else
+            {
+                if (distance >= EnemyRetreatMaxRadius)
+                {
+                    return 0;
+                }
+
+                travel = EnemyRetreatMaxRadius - distance;
+                if (travel > maxTravel)
+                {
+                    travel = maxTravel;
+                }
+
+                direction = -direction;
+            }
+
+            if (travel <= 0f)
+            {
+                return 0;
+            }
+
+            writer.Submit(new MoveIntent(enemy.Handle, direction * travel));
+            return 1;
+        }
+
+        /// <summary>
+        /// 这个敌人名下是否还有在飞的弹。弹被护盾反射后 <c>Owner</c> 改成主角，
+        /// 因此"没有自己的弹"= 这一发已经打出去了，可以用来近似"冷却就绪"。
+        /// </summary>
+        private static bool HasProjectileOwnedBy(
+            IProjectileWorldReadView? projectiles, UnitHandle owner)
+        {
+            if (projectiles == null)
+            {
+                return false;
+            }
+
+            int count = projectiles.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (projectiles[i].Owner == owner)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 推进到下一波；已是最后一波则判胜。
         /// 换波前把本波反射次数折进累计值——旧会话换掉后就再也读不到它了。
         /// </summary>
@@ -537,6 +815,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _sandbox = sandbox;
             _units = session as IUnitWorldReadView;
             _projectiles = session as IProjectileWorldReadView;
+            _intents = session as IIntentWriter;
 
             if (_units == null || _projectiles == null)
             {
@@ -729,6 +1008,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _sandbox = null;
             _units = null;
             _projectiles = null;
+            _intents = null;
 
             GameplayResult result;
             try
@@ -793,6 +1073,8 @@ namespace AIFramework.Adapters.Unity.Battle
             _sandbox = null;
             _units = null;
             _projectiles = null;
+            _intents = null;
+            _enemyAi = null;
             _finished = true;
 
             // 音效桥先摘引用再释放音源：桥的 Tick 只在 Update 里跑，摘引用保证卸载过程中不会再有
@@ -927,6 +1209,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _sandbox = null;
             _units = null;
             _projectiles = null;
+            _intents = null;
             _wave = 0;
             _finished = true;
 
@@ -952,6 +1235,7 @@ namespace AIFramework.Adapters.Unity.Battle
                 _sandbox = null;
                 _units = null;
                 _projectiles = null;
+                _intents = null;
                 _replaying = false;
             }
 
@@ -1034,6 +1318,10 @@ namespace AIFramework.Adapters.Unity.Battle
                     binder.Sync();
                 }
 
+                // 回放局必须与录制局执行同一份 AI 决策：位移意图在第 5 相位落位，
+                // 所以只能在 Step 之后、下一次 Step 之前提交；日志在回放中关闭（不影响状态）。
+                TickEnemyAi(wave, log: false);
+
                 ReadField(out int protagonistHp, out int aliveEnemies);
 
                 // 与 Tick 同序：主角阵亡 → 敌人清空 → 内核先收场 → 总帧数触顶。
@@ -1072,6 +1360,7 @@ namespace AIFramework.Adapters.Unity.Battle
                 _sandbox = null;
                 _units = null;
                 _projectiles = null;
+                _intents = null;
 
                 wave++;
                 if (!BeginReplayWave(host, script, wave))
@@ -1127,6 +1416,7 @@ namespace AIFramework.Adapters.Unity.Battle
             _sandbox = sandbox;
             _units = units;
             _projectiles = projectiles;
+            _intents = session as IIntentWriter;
             _binder = new RealtimeSceneBinder(host, units, projectiles, transform);
             _protagonist = DeployWave(sandbox, wave, _binder, in spec);
 

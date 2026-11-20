@@ -104,6 +104,7 @@ namespace AIFramework.Adapters.Console
             WireLeaderboardPager();
             WireVoiceOver();
             WireSaveMigration();
+            WireEconomySim();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -356,6 +357,22 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>
+        /// 经济模拟演示：按"每日 20 局、每局掉落 120 金币、商店日消耗 1500"跑 30 天，看通胀判定。
+        /// <para>数字是演示假设，真实数值应来自掉落表/商店表按玩法时长加权。</para>
+        /// </summary>
+        private void WireEconomySim()
+        {
+            var days = new EconomyDay[30];
+            for (int i = 0; i < days.Length; i++)
+            {
+                days[i] = new EconomyDay(earnedCurrency: 20 * 120, spentCurrency: 1500, earnedItems: 20, spentItems: 15);
+            }
+
+            EconomyVerdict verdict = EconomySimulator.Simulate(days);
+            _writer.WriteLine(verdict.ToReportLine());
         }
 
         /// <summary>
