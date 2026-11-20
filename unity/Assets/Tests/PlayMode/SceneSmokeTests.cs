@@ -160,6 +160,12 @@ namespace AIFramework.Tests.PlayMode
             yield return LoadAndRun<AIFrameworkBehaviour>("DemoScene");
         }
 
+        [UnityTest]
+        public IEnumerator MonopolyScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<MonopolyController>("MonopolyScene");
+        }
+
         private static IEnumerator LoadAndRun<TComponent>(string sceneName) where TComponent : Component
         {
             var errors = new List<string>();

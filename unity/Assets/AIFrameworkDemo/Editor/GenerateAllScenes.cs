@@ -46,6 +46,7 @@ namespace AIFramework.Demo.Editor
             AsyncPvpSceneBuilder.CreateAsyncPvpScene();
             TycoonSceneBuilder.CreateTycoonScene();
             IdleRpgSceneBuilder.CreateIdleRpgScene();
+            MonopolySceneBuilder.CreateMonopolyScene();
             BootSceneBuilder.CreateBootScene();
 
             // Build Settings 属于工程配置（ProjectSettings/EditorBuildSettings.asset），

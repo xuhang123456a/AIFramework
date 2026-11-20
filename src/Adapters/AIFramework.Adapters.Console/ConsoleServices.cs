@@ -370,6 +370,16 @@ namespace AIFramework.Adapters.Console
                 + " 去广告=" + noAds.State + " 重复购买=" + noAdsRepeat.State
                 + " 恢复=" + iap.RestorePurchases().Length + " 台账=" + iapLedger.RecordCount);
 
+            var leaderboard = new ConsoleLeaderboardService(capacity: 4);
+            leaderboard.Submit(new LeaderboardEntry(1, 1200, 10));
+            leaderboard.Submit(new LeaderboardEntry(2, 3400, 11));
+            leaderboard.Submit(new LeaderboardEntry(3, 800, 12));
+            LeaderboardSnapshot top = leaderboard.QueryTop(2, playerId: 1);
+            writer.WriteLine(
+                "[Leaderboard] 第一=" + top.Top[0].PlayerId + "(" + top.Top[0].Score + ")"
+                + " 第二=" + top.Top[1].PlayerId + "(" + top.Top[1].Score + ")"
+                + " 自己名次=" + top.OwnRank + " 总数=" + top.TotalEntries);
+
             var ledger = new MatchValidationLedger();
             var normal = new MatchSummary(
                 kernelType: 2, levelId: 1, randomSeed: 20261120, frameCount: 600, stateFingerprint: 0x5EEDL, score: 1200);

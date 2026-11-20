@@ -172,6 +172,7 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "AsyncPvpButton", "进入异步PVP场景", "AsyncPvpScene");
             CreateSceneEntry(root, "TycoonButton", "进入模拟经营场景", "TycoonScene");
             CreateSceneEntry(root, "IdleRpgButton", "进入挂机 RPG 场景", "IdleRpgScene");
+            CreateSceneEntry(root, "MonopolyButton", "进入大富翁场景", "MonopolyScene");
 
             CreateOverlayLayer(canvas);
 

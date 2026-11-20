@@ -299,7 +299,8 @@ namespace AIFramework.Tests.EditMode
             "Assets/AIFrameworkDemo/Scenes/AsyncPvpScene.unity",
             "Assets/AIFrameworkDemo/Scenes/TycoonScene.unity",
             "Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity",
-            "Assets/AIFrameworkDemo/Scenes/DemoScene.unity"
+            "Assets/AIFrameworkDemo/Scenes/DemoScene.unity",
+            "Assets/AIFrameworkDemo/Scenes/MonopolyScene.unity"
         };
 
         [Test]

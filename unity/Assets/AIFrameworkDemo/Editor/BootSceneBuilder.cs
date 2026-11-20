@@ -108,6 +108,7 @@ namespace AIFramework.Demo.Editor
             AddIfSceneExists(scenes, TycoonScenePath);
             AddIfSceneExists(scenes, IdleRpgScenePath);
             AddIfSceneExists(scenes, DemoScenePath);
+            AddIfSceneExists(scenes, MonopolyScenePath);
 
             if (scenes.Count == 0)
             {
@@ -212,6 +213,9 @@ namespace AIFramework.Demo.Editor
         private const string IdleRpgScenePath = "Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity";
 
         /// <summary>Realtime 最小演示场景路径。</summary>
+        /// <summary>大富翁场景路径。</summary>
+        private const string MonopolyScenePath = "Assets/AIFrameworkDemo/Scenes/MonopolyScene.unity";
+
         private const string DemoScenePath = "Assets/AIFrameworkDemo/Scenes/DemoScene.unity";
 
         private static void AddIfSceneExists(List<EditorBuildSettingsScene> scenes, string assetPath)
