@@ -60,47 +60,51 @@ function Invoke-Gate {
     $results.Add("OK   " + $Name)
 }
 
-Invoke-Gate -Name '1/12 语言层：dotnet build' -Action {
+Invoke-Gate -Name '1/13 语言层：dotnet build' -Action {
     dotnet build AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '2/12 纯逻辑测试：dotnet test' -Action {
+Invoke-Gate -Name '2/13 纯逻辑测试：dotnet test' -Action {
     dotnet test AIFramework.Pure.sln -v q --nologo
 }
 
-Invoke-Gate -Name '3/12 生成物一致性：viewgen --all' -Action {
+Invoke-Gate -Name '3/13 生成物一致性：viewgen --all' -Action {
     dotnet run --project tools/viewgen/ViewGen.csproj -- --all
 }
 
-Invoke-Gate -Name '4/12 配置表一致性：tablegen --check' -Action {
+Invoke-Gate -Name '4/13 配置表一致性：tablegen --check' -Action {
     dotnet run --project tools/tablegen/TableGen.csproj -- --check
 }
 
-Invoke-Gate -Name '5/12 数值体检：tablecheck' -Action {
+Invoke-Gate -Name '5/13 数值体检：tablecheck' -Action {
     dotnet run --project tools/tablecheck/TableCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '6/12 本地化完整性：loccheck' -Action {
+Invoke-Gate -Name '6/13 本地化完整性：loccheck' -Action {
     dotnet run --project tools/loccheck/LocCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '7/12 运营排期：opcheck' -Action {
+Invoke-Gate -Name '7/13 运营排期：opcheck' -Action {
     dotnet run --project tools/opcheck/OpCheck.csproj -- --tables tables
 }
 
-Invoke-Gate -Name '8/12 波次节奏：wavecheck' -Action {
+Invoke-Gate -Name '8/13 波次节奏：wavecheck' -Action {
     dotnet run --project tools/wavecheck/WaveCheck.csproj -- --tables tables --check
 }
 
-Invoke-Gate -Name '9/12 本地化转换：locconvert --check' -Action {
+Invoke-Gate -Name '9/13 本地化转换：locconvert --check' -Action {
     dotnet run --project tools/locconvert/LocConvert.csproj -- --tables tables --check
 }
 
-Invoke-Gate -Name '10/12 技能表：skillcheck --check' -Action {
+Invoke-Gate -Name '10/13 技能表：skillcheck --check' -Action {
     dotnet run --project tools/skillcheck/SkillCheck.csproj -- --tables tables --check
 }
 
-Invoke-Gate -Name '11/12 适配层形状：check-adapter-compile' -Action {
+Invoke-Gate -Name '11/13 埋点契约：analyticscheck --check' -Action {
+    dotnet run --project tools/analyticscheck/AnalyticsCheck.csproj -- --repo . --check
+}
+
+Invoke-Gate -Name '12/13 适配层形状：check-adapter-compile' -Action {
     pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 }
 
@@ -109,16 +113,16 @@ if ($Unity) {
         throw ("找不到 Unity 可执行文件：{0}（用 -UnityPath 指定）" -f $UnityPath)
     }
 
-    Invoke-Gate -Name '12/12a 真 Unity：场景生成 + 装配校验' -Action {
+    Invoke-Gate -Name '13/13a 真 Unity：场景生成 + 装配校验' -Action {
         pwsh -NoProfile -File unity/tools/generate-scenes.ps1 -UnityPath $UnityPath
     }
 
     if (-not $SkipUnityTests) {
-        Invoke-Gate -Name '12/12b 真 Unity：EditMode 测试' -Action {
+        Invoke-Gate -Name '13/13b 真 Unity：EditMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform EditMode
         }
 
-        Invoke-Gate -Name '12/12c 真 Unity：PlayMode 测试' -Action {
+        Invoke-Gate -Name '13/13c 真 Unity：PlayMode 测试' -Action {
             pwsh -NoProfile -File unity/tools/run-unity-tests.ps1 -UnityPath $UnityPath -TestPlatform PlayMode
         }
     }

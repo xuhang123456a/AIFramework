@@ -2,6 +2,7 @@
 using AIFramework.Contracts.Cqe;
 using AIFramework.Contracts.Gameplay;
 using AIFramework.Contracts.Gameplay.Turn;
+using AIFramework.Contracts.Gm;
 using AIFramework.Contracts.Meta;
 using AIFramework.Contracts.Numerics;
 using AIFramework.Core.Cqe;
@@ -110,6 +111,7 @@ namespace AIFramework.Adapters.Console
             WireMatch3Difficulty();
             WirePlayerMetrics();
             WireGuideDemo();
+            WireSaveCompression();
             RunReplayArchiveSmoke();
             RunStorePurchaseSmoke();
             SignInPresenter presenter = WireDailySignIn(out SignInHandler signIn);
@@ -142,6 +144,7 @@ namespace AIFramework.Adapters.Console
             CartridgeShowcase.Run(_writer);
             ConsoleServices.RunSelfCheck(_writer);
             PublishBattleFacts();
+            WireGm();
             CleanupStorage();
 
             _writer.WriteLine("Realtime 推进帧数=" + realtimeFrames + "，最终道具=" + DescribeInventory());
@@ -362,6 +365,38 @@ namespace AIFramework.Adapters.Console
             int failures = ResourceManifestVerifier.CountFailures(outcomes);
             _writer.WriteLine("[Resource] 清单=" + entries.Length + " 校验=" + outcomes.Length
                 + " 失败=" + failures + " 可回退=" + (!ResourceManifestVerifier.AllOk(outcomes) ? "是" : "否"));
+        }
+
+        /// <summary>存档压缩演示：对真实 AISV 存档做 deflate，打印体积对比（云存档按字节计费）。</summary>
+        private void WireSaveCompression()
+        {
+            var seeder = new SaveService(_storage, "compress-seed");
+            // 用"接近真实"的存档规模（60 种道具）：48 字节的小档压缩后反而更大，
+            // 正是 ShouldCompress 阈值存在的理由；演示也要展示真实收益而不是负数。
+            var entries = new InventoryEntrySnapshot[60];
+            for (int i = 0; i < entries.Length; i++)
+            {
+                entries[i] = new InventoryEntrySnapshot(1001 + (i * 7), 10 + i);
+            }
+
+            byte[] payload = InventorySaveCodec.Encode(entries);
+            seeder.Save(0, new SaveEnvelope(SaveService.CurrentVersion, payload));
+            byte[]? saveBytes = _storage.Read(seeder.Key(0));
+
+            if (saveBytes == null)
+            {
+                _writer.WriteLine("[Compress] 无存档可压。");
+                return;
+            }
+
+            if (!SaveCompression.ShouldCompress(saveBytes.Length))
+            {
+                _writer.WriteLine("[Compress] 存档仅 " + saveBytes.Length + "B，低于压缩阈值，跳过（头开销更大）。");
+                return;
+            }
+
+            SaveCompressionReport report = SaveCompression.Evaluate(saveBytes);
+            _writer.WriteLine(report.ToReportLine());
         }
 
         /// <summary>引导自动演示：脚本化"触发→推进"并按时间推进，验证演示链路可被数据驱动。</summary>
@@ -998,6 +1033,53 @@ namespace AIFramework.Adapters.Console
             }
 
             _writer.WriteLine("[Quest] 两场战斗后进度：" + builder);
+        }
+
+        /// <summary>
+        /// GM 控制台演示：把已有能力（发货 / 统计 / 引导跳过）包成 GM 命令，用合法权限跑 3 条，
+        /// 再用 Player 权限跑 1 条 Admin 命令（必须被拒且留痕），最后打印审计条数与首条记录。
+        /// <para>审计是 GM 的追责底线：越权尝试也要有一条 <c>Success=false</c> 的记录。</para>
+        /// </summary>
+        private void WireGm()
+        {
+            var hooks = new GmConsoleHooks
+            {
+                ItemCountById = itemId => _inventory.GetCount(itemId),
+                GuideStepId = () => QueryGuide().StepId,
+                GuideCompletedCount = () => QueryGuide().CompletedCount,
+                GuideTotalCount = () => QueryGuide().TotalCount,
+                AdvanceTime = seconds => _time.Advance(seconds),
+                ExtraStats = () => "items=" + DescribeInventory(),
+            };
+
+            var adapter = new GmConsoleAdapter(_bus, _time, hooks);
+            IGmConsole gm = adapter.Console;
+
+            GmCommandResult give = gm.Execute("gm.give", new[] { "1001", "100" }, GmPermission.Admin, "console-operator");
+            _writer.WriteLine("[GM] gm.give 1001 100 成功=" + give.Success + " 输出=" + give.Output);
+
+            GmCommandResult stats = gm.Execute("gm.stats", Array.Empty<string>(), GmPermission.Player, "console-operator");
+            _writer.WriteLine("[GM] gm.stats 成功=" + stats.Success + " 输出=" + stats.Output);
+
+            GmCommandResult reset = gm.Execute("gm.reset.guide", Array.Empty<string>(), GmPermission.Support, "console-operator");
+            _writer.WriteLine("[GM] gm.reset.guide 成功=" + reset.Success + " 输出=" + reset.Output);
+
+            // 越权验证：同一个命令，Player 权限必须被拒（reason 固定为 permission denied）。
+            GmCommandResult denied = gm.Execute("gm.give", new[] { "1001", "1" }, GmPermission.Player, "console-player");
+            _writer.WriteLine("[GM] gm.give(Player) 成功=" + denied.Success + " 原因=" + denied.Reason);
+
+            GmAuditEntry[] audit = gm.AuditLog;
+            GmAuditEntry first = audit.Length > 0 ? audit[0] : default;
+            _writer.WriteLine("[GM] 审计=" + audit.Length + " 条 首条=" + first.Command
+                + " args=[" + first.Arguments + "] op=" + first.OperatorId
+                + " 权限=" + first.Permission + " 成功=" + first.Success
+                + " 时间=" + first.ExecutedAtUnixSeconds);
+        }
+
+        /// <summary>引导快照查询（GM 统计与引导演示共用同一口径）。</summary>
+        private GuideSnapshot QueryGuide()
+        {
+            return _bus.Query<GuideQueryRequest, GuideSnapshot>(new GuideQueryRequest());
         }
 
         /// <summary>
