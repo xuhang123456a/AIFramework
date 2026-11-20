@@ -103,7 +103,7 @@
 | T5-3 | 商店→IAP→发货→埋点闭环 | 购买结果接进 Shop/Inventory，重复购买/恢复购买不发双份，埋点记录 | [x] `StorePurchaseCoordinator` 34 例 + Console 流程 12 例；防双发/恢复不重发/台账两份实例的坑已锁 |
 | T5-4 | 回放落盘与列表 | Arena 录像经 IStoragePort 落盘、列表查询、版本校验 | [ ] |
 | T5-5 | 数值健康检查工具 | `tools/tablecheck`：价格>0、经验单调、奖励 id 可解析 | [x] 14 张表规则 + 20 例（每条规则有"写坏必红"的用例）+ verify-all 第 5 层 + CI |
-| T5-6 | 本地化完整性工具 | 扫描 bindings/场景与文案表，报告缺失 key 与多余 key | [ ] |
+| T5-6 | 本地化完整性工具 | 扫描 bindings/场景与文案表，报告缺失 key 与多余 key | [x] `tools/loccheck`：ui.* 引用扫描 + 缺 key 报错/未引用提示 + `loccheck:ignore` 豁免 + 12 例；verify-all 第 6 层 |
 | T5-7 | Realtime 音效桥 | 战斗事件（命中/格挡/死亡）→ IAudioService，节流与去重 | [ ] |
 | T5-8 | 旧档回归夹具 | 把 v1 存档字节做成 fixture，锁住迁移链不退化 | [x] 48 字节真实 v1 档冻结 + CRC 损坏/未来版本拒绝 + 迁移后解码 4 例 |
 | T5-9 | 关卡编辑器（网格） | 编辑器里画格子 → 生成 Puzzle/Platformer 关卡数据 | [ ] |

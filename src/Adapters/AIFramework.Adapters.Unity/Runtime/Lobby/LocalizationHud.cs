@@ -94,7 +94,7 @@ namespace AIFramework.Adapters.Unity.Lobby
 
             if (fallbackText != null)
             {
-                LocalizedText missing = Query(host, "ui.missing");
+                LocalizedText missing = Query(host, "ui.missing"); // loccheck:ignore 故意缺 key 验证回退
                 fallbackText.text = "缺 key 回退：" + missing.Text + (missing.Found ? string.Empty : "（未找到，已回退 key）");
             }
         }

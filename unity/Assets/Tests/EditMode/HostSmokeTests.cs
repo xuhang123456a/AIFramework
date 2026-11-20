@@ -153,10 +153,11 @@ namespace AIFramework.Tests.EditMode
             LocalizedText english = host.Bus.Query<LocalizationQueryRequest, LocalizedText>(in play);
             Assert.AreEqual("Play", english.Text, "切到英文后 ui.play 应变英文。");
 
-            var missing = new LocalizationQueryRequest("ui.not-exist");
+            const string MissingKey = "ui.not-exist"; // loccheck:ignore 故意缺 key 验证回退
+            var missing = new LocalizationQueryRequest(MissingKey);
             LocalizedText fallback = host.Bus.Query<LocalizationQueryRequest, LocalizedText>(in missing);
             Assert.IsFalse(fallback.Found, "不存在的 key 应标记 Found=false。");
-            Assert.AreEqual("ui.not-exist", fallback.Text, "缺 key 时文案回退成 key 本身。");
+            Assert.AreEqual(MissingKey, fallback.Text, "缺 key 时文案回退成 key 本身。");
         }
 
         [Test]

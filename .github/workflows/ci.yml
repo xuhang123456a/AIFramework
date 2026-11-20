@@ -33,6 +33,9 @@ jobs:
       - name: 配置表 JSON 与已导出 .bin 一致（改 JSON 忘导出即失败）
         run: dotnet run --project tools/tablegen/TableGen.csproj --no-build -- --check
 
+      - name: 本地化完整性（缺 key 报错、未引用只提示）
+        run: dotnet run --project tools/loccheck/LocCheck.csproj --no-build -- --tables tables
+
       - name: Unity 适配层形状级编译校验（无需 Unity）
         run: pwsh -NoProfile -File unity/tools/check-adapter-compile.ps1
 
