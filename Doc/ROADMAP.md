@@ -85,9 +85,9 @@
 | T4-4 | 成就系统 | 切片：成就定义表 + 解锁判定 + 通知事件 + 无头测试 | [x] `Feature.Achievement` + `TbAchievement`(430B,12 行) + 38 例；宿主/Console 桥接已接 |
 | T4-5 | 活动/Battle Pass | 赛季配置 + 任务进度 + 奖励领取 + 时间源可快进 | [x] `Feature.SeasonPass` + `TbSeasonPass`(724B,30 级) + 双轨领取 + 58 例；宿主/Console 已接 |
 | T4-6 | 埋点端口 | `IAnalyticsService`（零分配事件写法）+ Console 环形记录 | [x] 契约 + `AnalyticsEventBuffer`(零分配) + 双端实现 + 24 例 + Console `[Track]` 自检 |
-| T4-7 | 输入抽象 | 手柄/触屏/键鼠统一 `IInputSource`，让 Runner/Platformer 可换输入 | [ ] |
+| T4-7 | 输入抽象 | 手柄/触屏/键鼠统一 `IInputSource`，让 Runner/Platformer 可换输入 | [x] `IInputSource` + Scripted/Keyboard/Touch/Composite + 场景路由（Runner/Platformer 两子类）+ 25 例 + PlayMode 4 例 |
 | T4-8 | 大富翁玩法 | Turn 内核新卡带（骰子 + 事件格 + 资产），补 T2-8 未做的分支 | [x] 内核 50 例 + Controller/HUD/Scene（第 24 场景，PlayMode 冒烟过） |
-| T4-9 | 视觉小说 | 纯数据剧本状态机 + 选项分支 + 存档快照 | [ ] |
+| T4-9 | 视觉小说 | 纯数据剧本状态机 + 选项分支 + 存档快照 | [x] `VisualNovelWorld` 51 例 + 条件选项/4 结局 + CaptureState；第 25 场景 PlayMode 过 |
 | T4-10 | 多端包体体检 | 各平台模块/包体大小检查清单（待 IL2CPP 模块就绪后执行） | [ ] |
 
 ---

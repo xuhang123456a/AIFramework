@@ -173,6 +173,7 @@ namespace AIFramework.Demo.Editor
             CreateSceneEntry(root, "TycoonButton", "进入模拟经营场景", "TycoonScene");
             CreateSceneEntry(root, "IdleRpgButton", "进入挂机 RPG 场景", "IdleRpgScene");
             CreateSceneEntry(root, "MonopolyButton", "进入大富翁场景", "MonopolyScene");
+            CreateSceneEntry(root, "VisualNovelButton", "进入视觉小说场景", "VisualNovelScene");
 
             CreateOverlayLayer(canvas);
 

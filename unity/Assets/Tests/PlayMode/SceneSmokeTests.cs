@@ -166,6 +166,12 @@ namespace AIFramework.Tests.PlayMode
             yield return LoadAndRun<MonopolyController>("MonopolyScene");
         }
 
+        [UnityTest]
+        public IEnumerator VisualNovelScene_Loads_AndRuns_WithoutErrors()
+        {
+            yield return LoadAndRun<VisualNovelController>("VisualNovelScene");
+        }
+
         private static IEnumerator LoadAndRun<TComponent>(string sceneName) where TComponent : Component
         {
             var errors = new List<string>();

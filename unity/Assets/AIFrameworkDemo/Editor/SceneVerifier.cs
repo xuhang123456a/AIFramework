@@ -70,6 +70,7 @@ namespace AIFramework.Demo.Editor
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/TycoonScene.unity", typeof(TycoonPanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/IdleRpgScene.unity", typeof(IdleRpgPanelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/MonopolyScene.unity", typeof(MonopolyController), requiresCanvas: true),
+            new SceneExpectation("Assets/AIFrameworkDemo/Scenes/VisualNovelScene.unity", typeof(VisualNovelController), requiresCanvas: true),
             new SceneExpectation("Assets/AIFrameworkDemo/Scenes/DemoScene.unity", typeof(AIFrameworkBehaviour))
         };
 

@@ -1,5 +1,6 @@
 #nullable enable
 using AIFramework.Adapters.Unity.Battle;
+using AIFramework.Adapters.Unity.Inputs;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -161,12 +162,24 @@ namespace AIFramework.Demo.Editor
             SetReference(hud, "rightButton", rightButton);
             SetReference(hud, "jumpButton", jumpButton);
 
+            // 输入路由（T4-7）：独立物体挂 PlatformerSceneInputRouter（SceneInputRouter 的平台跳跃子类），
+            // 把键鼠/触屏动作转发给控制器。为什么拆子类（而不是一个类挂两个控制器引用）见 SceneInputRouter 类注释：
+            // 场景生成末尾的 SceneVerifier 会把"可为空的序列化引用"判成漏注入，而本场景没有 RunnerController。
+            // 控制器 autoPlay 保持默认 true（场景一进来就是演示），路由在演示期间也照常转发按键——
+            // 玩家按键不会被静默吞掉；关掉 AutoPlay 后 A/D（或 ←/→）即可直接控制左右移动。
+            var inputRouterGo = new GameObject("InputRouter");
+            var inputRouter = inputRouterGo.AddComponent<PlatformerSceneInputRouter>();
+            SetReference(inputRouter, "platformer", controller);
+            SetBool(inputRouter, "enableKeyboard", true);
+            SetBool(inputRouter, "enableTouch", true);
+
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
 
             Debug.Log("[AIFramework] 平台跳跃场景已生成：" + ScenePath
                 + "，按 Play 运行（默认自动演示：角色一路向右、在坑边起跳，能自动通关；"
-                + "关掉 AutoPlay 后用『左移/右移/跳跃』手动操作，『下一关』循环 1→2→3→1）。");
+                + "键盘 A/D 或 ←/→=左右移动、Space=跳，触屏上滑=跳、下滑=蹲、点击左右半屏=主要/次要交互；"
+                + "关掉 AutoPlay 后用『左移/右移/跳跃』或键盘/触屏手动操作，『下一关』循环 1→2→3→1）。");
         }
 
         /// <summary>主相机（位置 <c>(0, 0, -10)</c>、正交，与其它场景保持一致）。</summary>

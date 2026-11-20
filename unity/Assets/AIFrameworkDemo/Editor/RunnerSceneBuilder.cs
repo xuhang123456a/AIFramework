@@ -1,5 +1,6 @@
 #nullable enable
 using AIFramework.Adapters.Unity.Battle;
+using AIFramework.Adapters.Unity.Inputs;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -145,12 +146,24 @@ namespace AIFramework.Demo.Editor
             SetReference(hud, "jumpButton", jumpButton);
             SetReference(hud, "slideButton", slideButton);
 
+            // 输入路由（T4-7）：独立物体挂 RunnerSceneInputRouter（SceneInputRouter 的跑酷子类），
+            // 把键鼠/触屏动作转发给控制器。为什么拆子类（而不是一个类挂两个控制器引用）见 SceneInputRouter 类注释：
+            // 场景生成末尾的 SceneVerifier 会把"可为空的序列化引用"判成漏注入，而本场景没有 PlatformerController。
+            // 控制器 autoPlay 保持默认 true（场景一进来就是演示），路由在演示期间也照常转发按键——
+            // 玩家按键不会被静默吞掉，腾空/落地是否生效由内核裁决；关掉 AutoPlay 后即为纯手动操作。
+            var inputRouterGo = new GameObject("InputRouter");
+            var inputRouter = inputRouterGo.AddComponent<RunnerSceneInputRouter>();
+            SetReference(inputRouter, "runner", controller);
+            SetBool(inputRouter, "enableKeyboard", true);
+            SetBool(inputRouter, "enableTouch", true);
+
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
 
             Debug.Log("[AIFramework] 跑酷场景已生成：" + ScenePath
                 + "，按 Play 运行（默认自动演示：跳过 ▲、蹲过 ▼；"
-                + "关掉 AutoPlay 后可点『跳跃/下蹲』手动操作）。");
+                + "键盘 Space=跳、S/↓=蹲，触屏上滑=跳、下滑=蹲，"
+                + "关掉 AutoPlay 后可点『跳跃/下蹲』或直接用键盘/触屏操作）。");
         }
 
         /// <summary>主相机（位置 <c>(0, 0, -10)</c>、正交，与其它场景保持一致）。</summary>
